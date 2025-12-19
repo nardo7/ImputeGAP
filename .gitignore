@@ -15,3 +15,12 @@ imputegap/datasets/fmri-objectviewing.txt
 imputegap/datasets/pollution.txt
 imputegap/datasets/test-large.txt
 *checkpoint.pth
+.vscode/
+imputegap.egg-info/
+imputegap_assets
+venv/
+__pycache__/
+
+
+# mac
+.DS_Store

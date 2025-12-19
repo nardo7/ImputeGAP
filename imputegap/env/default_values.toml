@@ -157,6 +157,13 @@ patience = 10
 epochs = 100
 workers = 0
 
+[rectsi]
+lr = 0.001
+batch_size = -1
+patience = 10
+epochs = 150
+workers = 0
+
 [bay_otide]
 K_trend = 30
 K_season = 1
