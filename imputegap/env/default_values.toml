@@ -163,6 +163,7 @@ batch_size = -1
 patience = 10
 epochs = 150
 workers = 0
+tr_ratio = 0.9
 
 [bay_otide]
 K_trend = 30

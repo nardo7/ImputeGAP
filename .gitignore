@@ -19,8 +19,11 @@ imputegap/datasets/test-large.txt
 imputegap.egg-info/
 imputegap_assets
 venv/
-__pycache__/
 
 
 # mac
 .DS_Store
+
+# algorithm logs
+imputegap/wrapper/AlgoPython/ReCTSi/logs/ 
+imputegap/wrapper/AlgoPython/GRIN/logs/ 

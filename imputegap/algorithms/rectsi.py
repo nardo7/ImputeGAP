@@ -1,6 +1,6 @@
 import time
 
-from imputegap.wrapper.AlgoPython.RECTSI.recoveryReCTSi import recoveryReCTSi
+from imputegap.wrapper.AlgoPython.ReCTSi.recoveryReCTSi import recoveryReCTSi
 
 
 def rectsi(
@@ -64,11 +64,8 @@ def rectsi(
 
     recov_data = recoveryReCTSi(
         input=incomp_data,
-        d_hidden=d_hidden,
         lr=lr,
         batch_size=batch_size,
-        window=window,
-        alpha=alpha,
         patience=patience,
         epochs=epochs,
         workers=workers,

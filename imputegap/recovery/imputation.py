@@ -2796,7 +2796,7 @@ class Imputation:
 
             algorithm = "rectsi"
 
-            def impute(self, user_def=True, params=None, tr_ratio=None):
+            def impute(self, user_def=True, params=None, tr_ratio=0.9):
                 """
                 Perform imputation using the Multivariate Time Series Imputation by Graph Neural Networks
 
