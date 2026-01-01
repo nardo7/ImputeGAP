@@ -13,6 +13,7 @@ def rectsi(
     tr_ratio=0.9,
     logs=True,
     verbose=True,
+    periodicity=24,
 ):
     """
     Perform imputation using the Multivariate Recurrent Neural Network (MRNN) algorithm.
@@ -71,6 +72,7 @@ def rectsi(
         workers=workers,
         tr_ratio=tr_ratio,
         verbose=verbose,
+        periodicity=periodicity,
     )
 
     end_time = time.time()

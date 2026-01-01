@@ -230,20 +230,22 @@ class SELayer(nn.Module):
 
 
 class ReCTSINet(nn.Module):
-    def __init__(self, d_in):
+    def __init__(self, d_in, periodicity):
         super(ReCTSINet, self).__init__()
         self.num_nodes = d_in
-        if d_in == 36:
-            self.steps_per_day = 24
-            # self.window_size = 36
-            self.window_size = 24
-        if d_in == 64:
-            self.steps_per_day = 288
-            self.window_size = 24
-        if d_in == 56:
-            self.steps_per_day = 1
-            self.window_size = 14
-            print("covid")
+        self.steps_per_day = periodicity  # relevant to know the number of time steps in a day for the embeddings
+        self.window_size = periodicity  # set window size equal to periodicity to get one day of window as the paper suggests in their ablation studies
+        # if d_in == 36:
+        #     self.steps_per_day = 24
+        #     # self.window_size = 36
+        #     self.window_size = 24
+        # if d_in == 64:
+        #     self.steps_per_day = 288
+        #     self.window_size = 24
+        # if d_in == 56:
+        #     self.steps_per_day = 1
+        #     self.window_size = 14
+        #     print("covid")
 
         self.base_dim = 8
         self.groups = 1

@@ -1,13 +1,3 @@
-# ===============================================================================================================
-# SOURCE: https://github.com/Graph-Machine-Learning-Group/grin
-#
-# THIS CODE HAS BEEN MODIFIED TO ALIGN WITH THE REQUIREMENTS OF IMPUTEGAP (https://arxiv.org/abs/2503.15250),
-#   WHILE STRIVING TO REMAIN AS FAITHFUL AS POSSIBLE TO THE ORIGINAL IMPLEMENTATION.
-#
-# FOR ADDITIONAL DETAILS, PLEASE REFER TO THE ORIGINAL PAPER:
-# https://openreview.net/pdf?id=kOu3-S3wJ7
-# ===============================================================================================================
-
 from functools import partial
 
 import torch
@@ -16,18 +6,22 @@ from torchmetrics.utilities.checks import _check_same_shape
 
 
 class MaskedMetric(Metric):
-    def __init__(self,
-                 metric_fn,
-                 mask_nans=False,
-                 mask_inf=False,
-                 dist_sync_on_step=False,
-                 process_group=None,
-                 dist_sync_fn=None,
-                 metric_kwargs=None,
-                 at=None):
-        super(MaskedMetric, self).__init__(dist_sync_on_step=dist_sync_on_step,
-                                           process_group=process_group,
-                                           dist_sync_fn=dist_sync_fn)
+    def __init__(
+        self,
+        metric_fn,
+        mask_nans=False,
+        mask_inf=False,
+        dist_sync_on_step=False,
+        process_group=None,
+        dist_sync_fn=None,
+        metric_kwargs=None,
+        at=None,
+    ):
+        super(MaskedMetric, self).__init__(
+            dist_sync_on_step=dist_sync_on_step,
+            process_group=process_group,
+            dist_sync_fn=dist_sync_fn,
+        )
 
         if metric_kwargs is None:
             metric_kwargs = dict()
@@ -38,8 +32,8 @@ class MaskedMetric(Metric):
             self.at = slice(None)
         else:
             self.at = slice(at, at + 1)
-        self.add_state('value', dist_reduce_fx='sum', default=torch.tensor(0.).float())
-        self.add_state('numel', dist_reduce_fx='sum', default=torch.tensor(0))
+        self.add_state("value", dist_reduce_fx="sum", default=torch.tensor(0.0).float())
+        self.add_state("numel", dist_reduce_fx="sum", default=torch.tensor(0))
 
     def _check_mask(self, mask, val):
         if mask is None:
@@ -56,7 +50,7 @@ class MaskedMetric(Metric):
         _check_same_shape(y_hat, y)
         val = self.metric_fn(y_hat, y)
         mask = self._check_mask(mask, val)
-        val = torch.where(mask, val, torch.tensor(0., device=val.device).float())
+        val = torch.where(mask, val, torch.tensor(0.0, device=val.device).float())
         return val.sum(), mask.sum()
 
     def _compute_std(self, y_hat, y):

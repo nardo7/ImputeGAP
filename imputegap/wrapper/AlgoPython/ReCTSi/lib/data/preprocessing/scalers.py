@@ -1,15 +1,6 @@
-# ===============================================================================================================
-# SOURCE: https://github.com/Graph-Machine-Learning-Group/grin
-#
-# THIS CODE HAS BEEN MODIFIED TO ALIGN WITH THE REQUIREMENTS OF IMPUTEGAP (https://arxiv.org/abs/2503.15250),
-#   WHILE STRIVING TO REMAIN AS FAITHFUL AS POSSIBLE TO THE ORIGINAL IMPLEMENTATION.
-#
-# FOR ADDITIONAL DETAILS, PLEASE REFER TO THE ORIGINAL PAPER:
-# https://openreview.net/pdf?id=kOu3-S3wJ7
-# ===============================================================================================================
-
 from abc import ABC, abstractmethod
 import numpy as np
+import torch
 
 
 class AbstractScaler(ABC):
@@ -45,7 +36,6 @@ class AbstractScaler(ABC):
         return self.transform(x)
 
     def to_torch(self):
-        import torch
         for p in self.params():
             param = getattr(self, p)
             param = np.atleast_1d(param)
@@ -67,7 +57,11 @@ class Scaler(AbstractScaler):
         pass
 
     def transform(self, x):
-        return (x - self.bias) / self.scale
+        transformed_part1 = (x[:, :x.shape[-1] // 3] - self.bias) / self.scale
+        remaining_part = x[:, x.shape[-1] // 3:]
+
+        result = torch.cat([transformed_part1, remaining_part], dim=1)
+        return result
 
     def inverse_transform(self, x):
         return x * self.scale + self.bias
@@ -83,6 +77,8 @@ class StandardScaler(Scaler):
         super(StandardScaler, self).__init__()
 
     def fit(self, x, mask=None, keepdims=True):
+        x=x[...,:x.shape[-1] // 3]
+
         if mask is not None:
             x = np.where(mask, x, np.nan)
             self.bias = np.nanmean(x, axis=self.axis, keepdims=keepdims)
@@ -99,11 +95,12 @@ class MinMaxScaler(Scaler):
         super(MinMaxScaler, self).__init__()
 
     def fit(self, x, mask=None, keepdims=True):
+        xx = x[..., :x.shape[-1] // 3]
         if mask is not None:
-            x = np.where(mask, x, np.nan)
-            self.bias = np.nanmin(x, axis=self.axis, keepdims=keepdims)
-            self.scale = (np.nanmax(x, axis=self.axis, keepdims=keepdims) - self.bias)
+            x = np.where(mask, xx, np.nan)
+            self.bias = np.nanmin(xx, axis=self.axis, keepdims=keepdims)
+            self.scale = (np.nanmax(xx, axis=self.axis, keepdims=keepdims) - self.bias)
         else:
-            self.bias = x.min(axis=self.axis, keepdims=keepdims)
-            self.scale = (x.max(axis=self.axis, keepdims=keepdims) - self.bias)
+            self.bias = xx.min(axis=self.axis, keepdims=keepdims)
+            self.scale = (xx.max(axis=self.axis, keepdims=keepdims) - self.bias)
         return self

@@ -10,7 +10,7 @@ from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from torch.optim.lr_scheduler import CosineAnnealingLR
 
 from imputegap.tools import utils
-from imputegap.wrapper.AlgoPython.ReCTSi.lib import config, datasets, fillers
+from imputegap.wrapper.AlgoPython.ReCTSi.lib import config, fillers
 from imputegap.wrapper.AlgoPython.ReCTSi.lib.data.datamodule import (
     SpatioTemporalDataModule,
 )
@@ -18,6 +18,7 @@ from imputegap.wrapper.AlgoPython.ReCTSi.lib.data.imputation_dataset import (
     GraphImputationDataset,
     ImputationDataset,
 )
+from imputegap.wrapper.AlgoPython.ReCTSi.lib.datasets import MissingValuesMyData
 from imputegap.wrapper.AlgoPython.ReCTSi.lib.nn import models
 from imputegap.wrapper.AlgoPython.ReCTSi.lib.nn.utils.metric_base import MaskedMetric
 from imputegap.wrapper.AlgoPython.ReCTSi.lib.nn.utils.metrics import (
@@ -70,6 +71,7 @@ def recoveryReCTSi(
     tr_ratio=0.9,
     seed=42,
     verbose=True,
+    periodicity=24,
 ):
     input_t = np.copy(input).T
     recov = np.copy(input_t)
@@ -127,7 +129,7 @@ def recoveryReCTSi(
     pl.seed_everything(seed)
 
     model_cls, filler_cls = get_model_classes("rectsi")
-    dataset = datasets.MissingValuesMyData(cont_data_matrix, mask_train)
+    dataset = MissingValuesMyData(cont_data_matrix, mask_train, periodicity)
 
     ########################################
     # create logdir and save configuration #
@@ -207,9 +209,13 @@ def recoveryReCTSi(
     ########################################
 
     # model's inputs
-    additional_model_hparams = dict(d_in=dm.d_in // 3, n_nodes=dm.n_nodes)
+    additional_model_hparams = dict(
+        d_in=dm.d_in // 3,
+        n_nodes=dm.n_nodes,
+        periodicity=periodicity,
+    )
     model_kwargs = parser_utils.filter_args(
-        args={**additional_model_hparams}, target_cls=model_cls
+        args={**additional_model_hparams}, target_cls=model_cls, return_dict=True
     )
 
     # loss and metrics

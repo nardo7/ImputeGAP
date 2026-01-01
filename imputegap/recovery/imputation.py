@@ -2796,6 +2796,18 @@ class Imputation:
 
             algorithm = "rectsi"
 
+            def __init__(self, incomp_data, periodicity: int):
+                """
+                Initialize the RECTSI imputer with incomplete data and periodicity per day.
+
+                :param incomp_data: np.ndarray
+                :param periodicity: int, optional
+                    Periodicity of the time series data (default is 24 for hourly data).
+                """
+
+                super().__init__(incomp_data)
+                self.periodicity = periodicity
+
             def impute(self, user_def=True, params=None, tr_ratio=0.9):
                 """
                 Perform imputation using the Multivariate Time Series Imputation by Graph Neural Networks
@@ -2889,6 +2901,7 @@ class Imputation:
                     tr_ratio=tr_ratio_config if tr_ratio is None else tr_ratio,
                     logs=self.logs,
                     verbose=self.verbose,
+                    periodicity=self.periodicity,
                 )
                 return self
 
