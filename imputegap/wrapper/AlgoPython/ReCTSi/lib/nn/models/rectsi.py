@@ -234,7 +234,7 @@ class ReCTSINet(nn.Module):
         super(ReCTSINet, self).__init__()
         self.num_nodes = d_in
         self.steps_per_day = periodicity  # relevant to know the number of time steps in a day for the embeddings
-        self.window_size = periodicity  # set window size equal to periodicity to get one day of window as the paper suggests in their ablation studies
+        self.window_size = 24  # set window size equal to periodicity to get one day of window as the paper suggests in their ablation studies
         # if d_in == 36:
         #     self.steps_per_day = 24
         #     # self.window_size = 36
@@ -384,7 +384,7 @@ class ReCTSINet(nn.Module):
         )
         out = self.output_proj(out).view(batch_size, self.num_nodes, self.window_size)
         out = out.transpose(1, 2)
-        final_output = torch.where(mask, masked_x, out)
+        final_output = out  # = torch.where(mask, masked_x, out)
         return final_output, final_output
 
     @staticmethod

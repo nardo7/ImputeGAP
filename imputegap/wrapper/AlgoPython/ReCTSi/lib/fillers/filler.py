@@ -1,13 +1,3 @@
-# ===============================================================================================================
-# SOURCE: https://github.com/Graph-Machine-Learning-Group/grin
-#
-# THIS CODE HAS BEEN MODIFIED TO ALIGN WITH THE REQUIREMENTS OF IMPUTEGAP (https://arxiv.org/abs/2503.15250),
-#   WHILE STRIVING TO REMAIN AS FAITHFUL AS POSSIBLE TO THE ORIGINAL IMPLEMENTATION.
-#
-# FOR ADDITIONAL DETAILS, PLEASE REFER TO THE ORIGINAL PAPER:
-# https://openreview.net/pdf?id=kOu3-S3wJ7
-# ===============================================================================================================
-
 import inspect
 from copy import deepcopy
 
@@ -30,7 +20,7 @@ class Filler(pl.LightningModule):
         optim_kwargs,
         loss_fn,
         scaled_target=False,
-        whiten_prob=0.05,
+        whiten_prob=0.3,
         metrics=None,
         scheduler_class=None,
         scheduler_kwargs=None,
@@ -240,24 +230,32 @@ class Filler(pl.LightningModule):
 
         # Extract mask and target
         mask = batch_data["mask"].clone().detach()
+
+        # select values to whiten for training
         batch_data["mask"] = torch.bernoulli(
             mask.clone().detach().float() * self.keep_prob
         ).byte()
         eval_mask = batch_data.pop("eval_mask").bool()
 
+        # print(
+        #     "DEBUG: eval_mask sum before/after",
+        #     eval_mask.sum().item(),
+        # )
+        # print("DEBUG: mask sum", mask.sum().item())
+        # print("DEBUG: mask differences eval_mask", (mask != eval_mask).sum().item())
         # ✅ Fix: Ensure all masks are correctly cast to boolean
         batch_data["mask"] = batch_data["mask"].bool()
         # ✅ Fix: Replace subtraction with logical AND & NOT
-        eval_mask = (mask | eval_mask) & (
-            ~batch_data["mask"]
-        )  # ✅ Logical NOT instead of subtraction
+        eval_mask = (mask | eval_mask) & ~batch_data[
+            "mask"
+        ]  # ✅ Logical NOT instead of subtraction
 
         y = batch_data.pop("y")
         y = y[..., : y.shape[-1] // 3]
 
         # Compute predictions and compute loss
         # imputation, imputation2, imputation3  = self.predict_batch(batch, preprocess=False, postprocess=False)
-        imputation, imputation2 = self.predict_batch(
+        imputation, predictions = self.predict_batch(
             batch, preprocess=False, postprocess=False
         )
 
@@ -269,7 +267,7 @@ class Filler(pl.LightningModule):
 
         # loss2=F.mse_loss(imputation2, imputation3)
         # loss = self.loss_fn(imputation, target, mask) + loss2
-        loss = self.loss_fn(imputation, target, mask)
+        loss = self.loss_fn(imputation, target, eval_mask)
         # Logging
         if self.scaled_target:
             imputation = self._postprocess(imputation, batch_preprocessing)
@@ -293,6 +291,22 @@ class Filler(pl.LightningModule):
 
         # Extract mask and target
         eval_mask = batch_data.pop("eval_mask", None)
+        mask = batch_data["mask"].clone().detach().bool()
+        batch_data["mask"] = batch_data["mask"].bool()
+
+        # Apply same masking logic as in training
+        eval_mask = mask | eval_mask
+        # print("DEBUG: mask differences eval_mask", (mask != eval_mask).sum().item())
+        # print(
+        #     "DEBUG: mask differences eval_mask_tmp",
+        #     (mask != eval_mask_tmp).sum().item(),
+        # )
+        # print(
+        #     "DEBUG: eval_mask sum before/after",
+        #     eval_mask.sum().item(),
+        #     eval_mask_tmp.sum().item(),
+        # )
+        # print("DEBUG: mask sum", mask.sum().item())
         y = batch_data.pop("y")
         y = y[..., : y.shape[-1] // 3]
 

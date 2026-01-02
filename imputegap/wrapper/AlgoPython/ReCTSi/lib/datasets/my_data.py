@@ -95,7 +95,7 @@ class MyData(PandasDataset):
 
 class MissingValuesMyData(MyData):
     def __init__(
-        self, data, tr_mask, periodicity, seed=42, p_fault=0.0015, p_noise=0.05
+        self, data, tr_mask, ts_mask, periodicity, seed=42, p_fault=0.0015, p_noise=0.05
     ):
         super(MissingValuesMyData, self).__init__(data, tr_mask, periodicity)
         self.rng = np.random.default_rng(seed)
@@ -110,7 +110,7 @@ class MissingValuesMyData(MyData):
             rng=self.rng,
         )
         # self.eval_mask = (eval_mask & self.mask).astype("uint8")
-        self.eval_mask = tr_mask.astype(bool)
+        self.eval_mask = ts_mask.astype(bool)
         self._mask = tr_mask.astype(bool)
         self.tr_mask = tr_mask.astype(bool)
 

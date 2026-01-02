@@ -27,7 +27,10 @@ from imputegap.wrapper.AlgoPython.ReCTSi.lib.nn.utils.metrics import (
     MaskedMRE,
     MaskedMSE,
 )
-from imputegap.wrapper.AlgoPython.ReCTSi.lib.utils import parser_utils
+from imputegap.wrapper.AlgoPython.ReCTSi.lib.utils import (
+    parser_utils,
+    prediction_dataframe,
+)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -48,26 +51,18 @@ def get_model_classes(model_str):
 
 def recoveryReCTSi(
     input,
-    d_hidden=32,
     lr=0.001,
     batch_size=-1,
     window=24,
-    alpha=10.0,
     patience=4,
     epochs=20,
     workers=0,
-    adj_threshold=0.1,
-    d_ff=16,
-    ff_dropout=0.1,
     stride=1,
     l2_reg=0.0,
     grad_clip_val=5.0,
     grad_clip_algorithm="norm",
     loss_fn="l1_loss",
     use_lr_schedule=True,
-    hint_rate=0.7,
-    g_train_freq=1,
-    d_train_freq=5,
     tr_ratio=0.9,
     seed=42,
     verbose=True,
@@ -79,7 +74,7 @@ def recoveryReCTSi(
 
     if batch_size == -1:
         batch_size = utils.compute_batch_size(
-            data=input, min_size=4, max_size=32, divisor=4, verbose=verbose
+            data=input_t, min_size=4, max_size=32, divisor=4, verbose=verbose
         )
 
     if verbose:
@@ -101,11 +96,17 @@ def recoveryReCTSi(
             verbose=False,
         )
     )
+    mask_test = mask_train.astype(bool)
+    mask_train = ~m_mask.astype(bool)
+
+    # original contaminated data mask
+    # mask_val = m_mask.astype(bool)
+
     # if error:
     #     return input
 
     input_data = np.copy(cont_data_matrix)
-    N, M = input_data.shape
+    T, N = input_data.shape
 
     # # Get indices where the value is True
     # s = ~nan_row_selector
@@ -129,7 +130,9 @@ def recoveryReCTSi(
     pl.seed_everything(seed)
 
     model_cls, filler_cls = get_model_classes("rectsi")
-    dataset = MissingValuesMyData(cont_data_matrix, mask_train, periodicity)
+
+    # use the original contaminated mask as training and the artificial mask for eval as done in literature
+    dataset = MissingValuesMyData(cont_data_matrix, mask_train, mask_test, periodicity)
 
     ########################################
     # create logdir and save configuration #
@@ -162,6 +165,7 @@ def recoveryReCTSi(
     )
 
     train_idxs, val_idxs, test_idxs = dataset.splitter(torch_dataset)
+
     # indices = np.arange(M)
     # train_idxs = flip_indices
     # test_idxs = other_indices
@@ -312,8 +316,14 @@ def recoveryReCTSi(
             dm.val_dataloader(), return_mask=True
         )
 
-    # Debugging the shapes before reshaping
-    y_hat = y_hat.detach().cpu().numpy().reshape(input_data.shape)
+    index = dm.torch_dataset.data_timestamps(dm.valset.indices, flatten=False)[
+        "horizon"
+    ]
+    third_of_columns = dataset.df.shape[1] // 3
+    df_hat = prediction_dataframe(y_hat, index, dataset.df.columns[:third_of_columns])
+
+    # Debugging the shapes before reshaping)
+    y_hat = df_hat.values.reshape(input_data.shape)
 
     print(f"{y_hat.shape = }")
 
