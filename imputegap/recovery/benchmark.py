@@ -1,15 +1,15 @@
 import datetime
-import os
 import math
+import os
 import time
 from collections import defaultdict
-import numpy as np
-import matplotlib.pyplot as plt
-import xlsxwriter
-from imputegap.tools import utils
-from imputegap.recovery.manager import TimeSeries
-import psutil
 
+import matplotlib.pyplot as plt
+import numpy as np
+import xlsxwriter
+
+from imputegap.recovery.manager import TimeSeries
+from imputegap.tools import utils
 
 
 class Benchmark:
@@ -47,7 +47,6 @@ class Benchmark:
         self.heatmap = None
         self.plots = None
 
-
     def _benchmark_exception(self, data, algorithm, pattern, x):
         """
         Check whether a specific algorithm-pattern combination should be excluded from benchmarking.
@@ -77,28 +76,37 @@ class Benchmark:
             - For PRISTI, always skip benchmarking.
         """
 
-        if algorithm.upper() == 'DEEPMVI' or algorithm.upper() == 'DEEP_MVI':
-            if pattern.lower() == "mcar" or pattern.lower() == "missing_completely_at_random":
+        if algorithm.upper() == "DEEPMVI" or algorithm.upper() == "DEEP_MVI":
+            if (
+                pattern.lower() == "mcar"
+                or pattern.lower() == "missing_completely_at_random"
+            ):
                 if x > 0.6:
-                    print(f"\n(BENCH) The imputation algorithm {algorithm} is not compatible with this configuration {pattern} with missingness rate more than 0.6.")
+                    print(
+                        f"\n(BENCH) The imputation algorithm {algorithm} is not compatible with this configuration {pattern} with missingness rate more than 0.6."
+                    )
                     return True
             if pattern.lower() == "mp" or pattern.lower() == "aligned":
                 if x < 0.15:
-                    print(f"\n(BENCH) The imputation algorithm {algorithm} is not compatible with this configuration {pattern} with missingness rate less then 0.15.")
+                    print(
+                        f"\n(BENCH) The imputation algorithm {algorithm} is not compatible with this configuration {pattern} with missingness rate less then 0.15."
+                    )
                     return True
             if data == "meteo":
                 return True
 
         if data == "meteo":
             if x >= 0.8:
-                print(f"\n(BENCH) The imputation algorithm {algorithm} is not compatible with this configuration {data}. Not enough series to train the model.")
+                print(
+                    f"\n(BENCH) The imputation algorithm {algorithm} is not compatible with this configuration {data}. Not enough series to train the model."
+                )
                 return True
-
-
 
         return False
 
-    def _config_optimization(self, opti_mean, ts_test, pattern, algorithm, block_size_mcar):
+    def _config_optimization(
+        self, opti_mean, ts_test, pattern, algorithm, block_size_mcar
+    ):
         """
         Configure and execute optimization for selected imputation algorithm and pattern.
 
@@ -121,8 +129,16 @@ class Benchmark:
             Configured imputer instance with optimal parameters.
         """
 
-        incomp_data = utils.config_contamination(ts=ts_test, pattern=pattern, dataset_rate=opti_mean, series_rate=opti_mean, block_size=block_size_mcar)
-        imputer = utils.config_impute_algorithm(incomp_data=incomp_data, algorithm=algorithm)
+        incomp_data = utils.config_contamination(
+            ts=ts_test,
+            pattern=pattern,
+            dataset_rate=opti_mean,
+            series_rate=opti_mean,
+            block_size=block_size_mcar,
+        )
+        imputer = utils.config_impute_algorithm(
+            incomp_data=incomp_data, algorithm=algorithm
+        )
 
         return imputer
 
@@ -174,16 +190,22 @@ class Benchmark:
                             for method_key, method_value in mean_value.items():
                                 for level_key, level_value in method_value.items():
                                     # Initialize scores and times if not already initialized
-                                    merger = merged_dict.setdefault(outer_key, {}
-                                                                    ).setdefault(middle_key, {}).setdefault(mean_key, {}
-                                                                                                            ).setdefault(
-                                        method_key, {}).setdefault(level_key, {"scores": {}})
+                                    merger = (
+                                        merged_dict.setdefault(outer_key, {})
+                                        .setdefault(middle_key, {})
+                                        .setdefault(mean_key, {})
+                                        .setdefault(method_key, {})
+                                        .setdefault(level_key, {"scores": {}})
+                                    )
 
                                     # Add scores and times
                                     for score_key, v in level_value["scores"].items():
-                                        if v is None :
+                                        if v is None:
                                             v = 0
-                                        merger["scores"][score_key] = (merger["scores"].get(score_key, 0) + v / count)
+                                        merger["scores"][score_key] = (
+                                            merger["scores"].get(score_key, 0)
+                                            + v / count
+                                        )
 
             results_avg.append(merged_dict)
 
@@ -243,11 +265,21 @@ class Benchmark:
 
         for i, dataset in enumerate(datasets_list):
             for j, algo in enumerate(algorithms_list):
-                comprehensive_matrix[i, j] = average_rmse_matrix[dataset].get(algo, np.nan)
+                comprehensive_matrix[i, j] = average_rmse_matrix[dataset].get(
+                    algo, np.nan
+                )
 
         return comprehensive_matrix, algorithms_list, datasets_list
 
-    def generate_heatmap(self, scores_list, algos, sets, metric="RMSE", save_dir="./reports", display=True):
+    def generate_heatmap(
+        self,
+        scores_list,
+        algos,
+        sets,
+        metric="RMSE",
+        save_dir="./reports",
+        display=True,
+    ):
         """
         Generate and save RMSE matrix in HD quality.
 
@@ -276,17 +308,21 @@ class Benchmark:
             os.makedirs(save_dir)
 
         nbr_algorithms = len(algos)
-        nbr_datasets= len(sets)
+        nbr_datasets = len(sets)
 
         cell_size = 4.0
-        x_size = cell_size*nbr_algorithms
-        y_size = cell_size*nbr_datasets
+        x_size = cell_size * nbr_algorithms
+        y_size = cell_size * nbr_datasets
 
         fig, ax = plt.subplots(figsize=(x_size, y_size))
         fig.canvas.manager.set_window_title("benchmark heatmap, " + metric)
 
         import matplotlib.colors as mcolors
-        cmap = mcolors.LinearSegmentedColormap.from_list(f"trunc({plt.cm.Greys.name},{0.3:.2f},{0.9:.2f})", plt.cm.Greys(np.linspace(0.3, 0.9, 256)))
+
+        cmap = mcolors.LinearSegmentedColormap.from_list(
+            f"trunc({plt.cm.Greys.name},{0.3:.2f},{0.9:.2f})",
+            plt.cm.Greys(np.linspace(0.3, 0.9, 256)),
+        )
 
         if metric == "RMSE":
             norm = plt.Normalize(vmin=0, vmax=2)
@@ -304,10 +340,10 @@ class Benchmark:
             norm = plt.Normalize(vmin=0, vmax=2000)
 
         # Create the heatmap
-        heatmap = ax.imshow(scores_list, cmap=cmap, norm=norm, aspect='auto')
+        heatmap = ax.imshow(scores_list, cmap=cmap, norm=norm, aspect="auto")
 
         # Add color bar for reference
-        cbar = plt.colorbar(heatmap, ax=ax, orientation='vertical')
+        cbar = plt.colorbar(heatmap, ax=ax, orientation="vertical")
         cbar.set_label(metric, rotation=270, labelpad=15)
 
         # Set the tick labels
@@ -317,23 +353,27 @@ class Benchmark:
         ax.set_yticklabels(sets)
 
         # Add titles and labels
-        ax.set_title('ImputeGAP Algorithms Comparison')
-        ax.set_xlabel('Algorithms')
-        ax.set_ylabel('Datasets')
+        ax.set_title("ImputeGAP Algorithms Comparison")
+        ax.set_xlabel("Algorithms")
+        ax.set_ylabel("Datasets")
 
         # Show values on the heatmap
         for i in range(len(sets)):
             for j in range(len(algos)):
-                ax.text(j, i, f"{scores_list[i, j]:.2f}",
-                        ha='center', va='center',
-                        color="black" if scores_list[i, j] < 1 else "white")  # for visibility
+                ax.text(
+                    j,
+                    i,
+                    f"{scores_list[i, j]:.2f}",
+                    ha="center",
+                    va="center",
+                    color="black" if scores_list[i, j] < 1 else "white",
+                )  # for visibility
 
-        filename = "benchmarking_"+ metric.lower()+ ".jpg"
+        filename = "benchmarking_" + metric.lower() + ".jpg"
         filepath = os.path.join(save_dir, filename)
-        plt.savefig(filepath, dpi=300, bbox_inches='tight')  # Save in HD with tight layout
-
-
-
+        plt.savefig(
+            filepath, dpi=300, bbox_inches="tight"
+        )  # Save in HD with tight layout
 
         # Show the plot
         if display:
@@ -347,7 +387,16 @@ class Benchmark:
 
         return True
 
-    def generate_reports_txt(self, runs_plots_scores, save_dir="./reports", dataset="", metrics=["RMSE"], run=-1, rt=0, verbose=True):
+    def generate_reports_txt(
+        self,
+        runs_plots_scores,
+        save_dir="./reports",
+        dataset="",
+        metrics=["RMSE"],
+        run=-1,
+        rt=0,
+        verbose=True,
+    ):
         """
         Generate and save a text report of metrics and timing for each dataset, algorithm, and pattern.
 
@@ -421,9 +470,10 @@ class Benchmark:
                     file.write("=" * 120 + "\n\n")
 
                     for metric in new_metrics:
-
                         if metric == "RUNTIME":
-                            file.write(f"\n{dataset}: {{{pattern}, {metric}[{metric_unit}], {opt}}}")
+                            file.write(
+                                f"\n{dataset}: {{{pattern}, {metric}[{metric_unit}], {opt}}}"
+                            )
                         else:
                             file.write(f"\n{dataset}: {{{pattern}, {metric}, {opt}}}")
 
@@ -444,8 +494,15 @@ class Benchmark:
                         column_widths = [5] + [18] * len(all_algorithms)
 
                         # Header and separator rows
-                        header_row = "".join(f" {header:^{width}} " for header, width in zip(headers, column_widths))
-                        separator_row = "" + "".join(f"{'' * (width + 2)}" for width in column_widths) + ""
+                        header_row = "".join(
+                            f" {header:^{width}} "
+                            for header, width in zip(headers, column_widths)
+                        )
+                        separator_row = (
+                            ""
+                            + "".join(f"{'' * (width + 2)}" for width in column_widths)
+                            + ""
+                        )
 
                         file.write(f"{separator_row}\n")
                         file.write(f"{header_row}\n")
@@ -453,7 +510,9 @@ class Benchmark:
 
                         if metric in to_call and verbose:
                             if metric == "RUNTIME":
-                                print(f"\n{dataset}: {{{pattern}, {metric}[{metric_unit}], {opt}}}")
+                                print(
+                                    f"\n{dataset}: {{{pattern}, {metric}[{metric_unit}], {opt}}}"
+                                )
                             else:
                                 print(f"\n{dataset}: {{{pattern}, {metric}, {opt}}}")
                             print(separator_row)
@@ -462,8 +521,14 @@ class Benchmark:
 
                         # Write each row
                         for rate in sorted(rate_to_scores.keys()):
-                            row_values = [rate] + [rate_to_scores[rate].get(algo, "") for algo in all_algorithms]
-                            row = "".join(f" {val:^{width}} " for val, width in zip(row_values, column_widths))
+                            row_values = [rate] + [
+                                rate_to_scores[rate].get(algo, "")
+                                for algo in all_algorithms
+                            ]
+                            row = "".join(
+                                f" {val:^{width}} "
+                                for val, width in zip(row_values, column_widths)
+                            )
                             file.write(f"{row}\n")
                             if metric in to_call and verbose:
                                 print(f"{row}")
@@ -475,8 +540,9 @@ class Benchmark:
                     file.write("Dictionary of Results:\n")
                     file.write(str(runs_plots_scores) + "\n")
 
-
-    def generate_reports_excel(self, runs_plots_scores, save_dir="./reports", dataset="", run=-1, verbose=True):
+    def generate_reports_excel(
+        self, runs_plots_scores, save_dir="./reports", dataset="", run=-1, verbose=True
+    ):
         """
         Generate and save an Excel-like text report of metrics and timing for each dataset, algorithm, and pattern.
 
@@ -509,7 +575,9 @@ class Benchmark:
         summary_sheet.set_column(0, 1, 50)
 
         # Title and header
-        summary_sheet.write(0, 0, "ImputeGAP, A library of Imputation Techniques for Time Series Data")
+        summary_sheet.write(
+            0, 0, "ImputeGAP, A library of Imputation Techniques for Time Series Data"
+        )
         summary_sheet.write(2, 0, "Report for Dataset")
         summary_sheet.write(2, 1, dataset)
         summary_sheet.write(3, 0, "Generated on")
@@ -526,10 +594,12 @@ class Benchmark:
             "RMSE": "Root Mean Square Error - Measures the average magnitude of error.",
             "MAE": "Mean Absolute Error - Measures the average absolute error.",
             "MI": "Mutual Information - Indicates dependency between variables.",
-            "CORRELATION": "Correlation Coefficient - Indicates linear relationship between variables."
+            "CORRELATION": "Correlation Coefficient - Indicates linear relationship between variables.",
         }
         for metric in metrics.keys():
-            summary_sheet.write_url(row, 0, f"internal:'{metric}'!A1", string=f"Go to {metric} Sheet")
+            summary_sheet.write_url(
+                row, 0, f"internal:'{metric}'!A1", string=f"Go to {metric} Sheet"
+            )
             row += 1
 
         # Write the dictionary content
@@ -546,11 +616,22 @@ class Benchmark:
             worksheet = workbook.add_worksheet(metric)
 
             # Write the metric description at the top and add IMPUTEGAP header
-            worksheet.write(0, 0, "ImputeGAP, A library of Imputation Techniques for Time Series Data")
+            worksheet.write(
+                0,
+                0,
+                "ImputeGAP, A library of Imputation Techniques for Time Series Data",
+            )
             worksheet.write(2, 0, f"{metric}: {description}")
 
             # Define consistent column headers and widths
-            headers = ["Dataset", "Algorithm", "Optimizer", "Pattern", "X Value", metric]
+            headers = [
+                "Dataset",
+                "Algorithm",
+                "Optimizer",
+                "Pattern",
+                "X Value",
+                metric,
+            ]
             column_widths = [15, 15, 15, 15, 12, 20]  # Adjust widths for Excel
 
             # Write the headers
@@ -568,7 +649,14 @@ class Benchmark:
                                 value = values.get("scores", {}).get(metric, None)
                                 if value is not None:
                                     value = f"{value:.10f}"
-                                    data = [dataset, algorithm, optimizer, pattern, str(x), value]
+                                    data = [
+                                        dataset,
+                                        algorithm,
+                                        optimizer,
+                                        pattern,
+                                        str(x),
+                                        value,
+                                    ]
                                     for col, cell_value in enumerate(data):
                                         worksheet.write(row, col, cell_value)
                                     row += 1
@@ -576,8 +664,18 @@ class Benchmark:
         # Close the workbook
         workbook.close()
 
-
-    def generate_plots(self, runs_plots_scores, ticks,  metrics=None, subplot=False, y_size=4, title=None, save_dir="./reports",display=False, verbose=True):
+    def generate_plots(
+        self,
+        runs_plots_scores,
+        ticks,
+        metrics=None,
+        subplot=False,
+        y_size=4,
+        title=None,
+        save_dir="./reports",
+        display=False,
+        verbose=True,
+    ):
         """
         Generate and save plots for each metric and pattern based on provided scores.
 
@@ -624,21 +722,23 @@ class Benchmark:
                 new_plots = new_plots + 1
                 new_metrics = np.append(new_metrics, "RUNTIME_LOG")
 
-        n_rows = int((len(new_metrics)+new_plots)/2)
+        n_rows = int((len(new_metrics) + new_plots) / 2)
 
         x_size, title_flag = 16, title
 
         for dataset, pattern_items in runs_plots_scores.items():
             for pattern, algo_items in pattern_items.items():
                 if subplot:
-                    fig, axes = plt.subplots(nrows=n_rows, ncols=2, figsize=(x_size*1.90, y_size*2.90))  # Adjusted figsize
+                    fig, axes = plt.subplots(
+                        nrows=n_rows, ncols=2, figsize=(x_size * 1.90, y_size * 2.90)
+                    )  # Adjusted figsize
                     fig.subplots_adjust(
                         left=0.04,
                         right=0.99,
                         top=0.97,
                         bottom=0.05,
                         wspace=0.095,
-                        hspace=0.35
+                        hspace=0.35,
                     )
 
                     if title_flag is None:
@@ -676,7 +776,6 @@ class Benchmark:
                             ax.plot(x_vals, y_vals, label=f"{algorithm}", linewidth=2)
                             ax.scatter(x_vals, y_vals)
                             has_data = True
-
 
                             if min_y > min(y_vals):
                                 min_y = min(y_vals)
@@ -721,8 +820,8 @@ class Benchmark:
                             if max_y > 5:
                                 max_y = 5
 
-                        diff = (max_y - min_y)
-                        y_padding = 0.15*diff
+                        diff = max_y - min_y
+                        y_padding = 0.15 * diff
 
                         if y_padding is None or y_padding == 0:
                             y_padding = 1
@@ -741,7 +840,13 @@ class Benchmark:
                         ax.set_xticks(ticks)
                         ax.set_xticklabels([f"{int(tick * 100)}%" for tick in ticks])
                         ax.grid(True, zorder=0)
-                        ax.legend(loc='upper left', fontsize=7, frameon=True, fancybox=True, framealpha=0.8)
+                        ax.legend(
+                            loc="upper left",
+                            fontsize=7,
+                            frameon=True,
+                            fancybox=True,
+                            framealpha=0.8,
+                        )
 
                     if not subplot:
                         filename = f"{dataset}_{pattern}_{optimizer}_{metric}.jpg"
@@ -755,7 +860,7 @@ class Benchmark:
                             plt.close()
 
                 if subplot:
-                    #plt.tight_layout()
+                    # plt.tight_layout()
                     new_dir = save_dir + "/" + pattern + "/error"
                     os.makedirs(new_dir, exist_ok=True)
                     filename = f"{dataset}_{pattern}_metrics_subplot.jpg"
@@ -769,7 +874,23 @@ class Benchmark:
 
         self.plots = plt
 
-    def eval(self, algorithms=["cdrec"], datasets=["eeg-alcohol"], patterns=["mcar"], x_axis=[0.05, 0.1, 0.2, 0.4, 0.6, 0.8], optimizers=["default_params"], metrics=["*"], save_dir="./imputegap_assets/benchmark", runs=1, normalizer="z_score", nbr_series=2500, nbr_vals=2500, dl_ratio=0.9, verbose=False):
+    def eval(
+        self,
+        algorithms=["cdrec"],
+        datasets=["eeg-alcohol"],
+        patterns=["mcar"],
+        x_axis=[0.05, 0.1, 0.2, 0.4, 0.6, 0.8],
+        optimizers=["default_params"],
+        metrics=["*"],
+        save_dir="./imputegap_assets/benchmark",
+        runs=1,
+        normalizer="z_score",
+        nbr_series=2500,
+        nbr_vals=2500,
+        dl_ratio=0.9,
+        verbose=False,
+        algo_params={},
+    ):
         """
         Execute a comprehensive evaluation of imputation algorithms over multiple datasets and patterns.
 
@@ -811,20 +932,42 @@ class Benchmark:
         -----
         Runs contamination, imputation, and evaluation, then generates plots and a summary reports.
         """
-        os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+        os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
         run_storage = []
         not_optimized = ["none"]
-        mean_group = ["mean", "MeanImpute", "min", "MinImpute", "zero", "ZeroImpute", "MeanImputeBySeries", "meanimpute", "minimpute", "zeroimpute", "meanimputebyseries"]
+        mean_group = [
+            "mean",
+            "MeanImpute",
+            "min",
+            "MinImpute",
+            "zero",
+            "ZeroImpute",
+            "MeanImputeBySeries",
+            "meanimpute",
+            "minimpute",
+            "zeroimpute",
+            "meanimputebyseries",
+        ]
 
         if not isinstance(algorithms, list):
-            raise TypeError(f"'algorithms' must be a list, but got {type(algorithms).__name__}")
+            raise TypeError(
+                f"'algorithms' must be a list, but got {type(algorithms).__name__}"
+            )
         if not isinstance(datasets, list):
-            raise TypeError(f"'datasets' must be a list, but got {type(datasets).__name__}")
+            raise TypeError(
+                f"'datasets' must be a list, but got {type(datasets).__name__}"
+            )
         if not isinstance(patterns, list):
-            raise TypeError(f"'patterns' must be a list, but got {type(patterns).__name__}")
+            raise TypeError(
+                f"'patterns' must be a list, but got {type(patterns).__name__}"
+            )
         if not isinstance(x_axis, list):
             raise TypeError(f"'x_axis' must be a list, but got {type(x_axis).__name__}")
+        if not isinstance(algo_params, dict):
+            raise TypeError(
+                f"'algo_params' must be a dict, but got {type(algo_params).__name__}"
+            )
 
         if "*" in metrics or "all" in metrics:
             metrics = utils.list_of_metrics()
@@ -841,7 +984,7 @@ class Benchmark:
             for dataset in datasets:
                 runs_plots_scores = {}
                 block_size_mcar = 10
-                y_p_size = max(4, len(algorithms)*0.275)
+                y_p_size = max(4, len(algorithms) * 0.275)
 
                 if verbose:
                     print("\n1. evaluation launch for", dataset, "\n")
@@ -853,22 +996,35 @@ class Benchmark:
                     header = True
 
                 reshp = False
-                default_data.load_series(data=utils.search_path(dataset), header=header, verbose=False)
+                default_data.load_series(
+                    data=utils.search_path(dataset), header=header, verbose=False
+                )
                 Mdef, Ndef = default_data.data.shape
 
                 if Ndef > nbr_vals or Mdef > nbr_series:
                     reshp = True
-                    print(f"\nThe dataset contains a large number of values {default_data.data.shape}, which may be too much for some algorithms to handle efficiently. Consider reducing the number of series or the volume of data.")
+                    print(
+                        f"\nThe dataset contains a large number of values {default_data.data.shape}, which may be too much for some algorithms to handle efficiently. Consider reducing the number of series or the volume of data."
+                    )
                 default_data = None
 
-                ts_test.load_series(data=utils.search_path(dataset), nbr_series=nbr_series, nbr_val=nbr_vals, header=header)
+                ts_test.load_series(
+                    data=utils.search_path(dataset),
+                    nbr_series=nbr_series,
+                    nbr_val=nbr_vals,
+                    header=header,
+                )
                 M, N = ts_test.data.shape
 
                 if reshp:
-                    print(f"Benchmarking module has reduced the shape to {ts_test.data.shape}.\n")
+                    print(
+                        f"Benchmarking module has reduced the shape to {ts_test.data.shape}.\n"
+                    )
 
                 if N < 250:
-                    print(f"The block size is too high for the number of values per series, reduce to 2\n")
+                    print(
+                        "The block size is too high for the number of values per series, reduce to 2\n"
+                    )
                     block_size_mcar = 2
 
                 if normalizer in utils.list_of_normalizers():
@@ -876,73 +1032,175 @@ class Benchmark:
 
                 for pattern in patterns:
                     if verbose:
-                        print("\n2. contamination of", dataset, "with pattern", pattern, "\n")
+                        print(
+                            "\n2. contamination of",
+                            dataset,
+                            "with pattern",
+                            pattern,
+                            "\n",
+                        )
 
                     for algorithm in algorithms:
                         has_been_optimized = False
 
+                        if algorithm not in algo_params.keys():
+                            algo_params[algorithm] = {}
+
                         if verbose:
-                            print("\n3. algorithm evaluated", algorithm, "with", pattern, "\n")
+                            print(
+                                "\n3. algorithm evaluated",
+                                algorithm,
+                                "with",
+                                pattern,
+                                "\n",
+                            )
                         else:
-                            print(f"{algorithm} is tested with {pattern}, started at {time.strftime('%Y-%m-%d %H:%M:%S')}.")
+                            print(
+                                f"{algorithm} is tested with {pattern}, started at {time.strftime('%Y-%m-%d %H:%M:%S')}."
+                            )
 
                         for incx, x in enumerate(x_axis):
                             if verbose:
-                                print("\n4. missing values (series&values) set to", x, "for x_axis\n")
+                                print(
+                                    "\n4. missing values (series&values) set to",
+                                    x,
+                                    "for x_axis\n",
+                                )
 
-                            incomp_data = utils.config_contamination(ts=ts_test, pattern=pattern, dataset_rate=x, series_rate=x, block_size=block_size_mcar, verbose=verbose)
+                            incomp_data = utils.config_contamination(
+                                ts=ts_test,
+                                pattern=pattern,
+                                dataset_rate=x,
+                                series_rate=x,
+                                block_size=block_size_mcar,
+                                verbose=verbose,
+                            )
 
                             for optimizer in optimizers:
-                                algo = utils.config_impute_algorithm(incomp_data=incomp_data, algorithm=algorithm, verbose=verbose)
+                                algo = utils.config_impute_algorithm(
+                                    incomp_data=incomp_data,
+                                    algorithm=algorithm,
+                                    verbose=verbose,
+                                    **algo_params[algorithm],
+                                )
 
                                 if isinstance(optimizer, dict):
-                                    optimizer_gt = {"input_data": ts_test.data, **optimizer}
-                                    optimizer_value = optimizer.get('optimizer')  # or optimizer['optimizer']
+                                    optimizer_gt = {
+                                        "input_data": ts_test.data,
+                                        **optimizer,
+                                    }
+                                    optimizer_value = optimizer.get(
+                                        "optimizer"
+                                    )  # or optimizer['optimizer']
 
-                                    if not has_been_optimized and algorithm not in mean_group and algorithm not in not_optimized:
+                                    if (
+                                        not has_been_optimized
+                                        and algorithm not in mean_group
+                                        and algorithm not in not_optimized
+                                    ):
                                         if verbose:
-                                            print("\n5. AutoML to set the parameters", optimizer, "\n")
-                                        i_opti = self._config_optimization(0.20, ts_test, pattern, algorithm, block_size_mcar)
+                                            print(
+                                                "\n5. AutoML to set the parameters",
+                                                optimizer,
+                                                "\n",
+                                            )
+                                        i_opti = self._config_optimization(
+                                            0.20,
+                                            ts_test,
+                                            pattern,
+                                            algorithm,
+                                            block_size_mcar,
+                                        )
 
-                                        if utils.check_family("DeepLearning", algorithm):
-                                            i_opti.impute(user_def=False, params=optimizer_gt, tr_ratio=0.80)
+                                        if utils.check_family(
+                                            "DeepLearning", algorithm
+                                        ):
+                                            i_opti.impute(
+                                                user_def=False,
+                                                params=optimizer_gt,
+                                                tr_ratio=0.80,
+                                            )
                                         else:
-                                            i_opti.impute(user_def=False, params=optimizer_gt)
+                                            i_opti.impute(
+                                                user_def=False, params=optimizer_gt
+                                            )
 
-                                        utils.save_optimization(optimal_params=i_opti.parameters, algorithm=algorithm, dataset=dataset, optimizer="e")
+                                        utils.save_optimization(
+                                            optimal_params=i_opti.parameters,
+                                            algorithm=algorithm,
+                                            dataset=dataset,
+                                            optimizer="e",
+                                        )
 
                                         has_been_optimized = True
                                     else:
                                         if verbose:
                                             print("\n5. AutoML already optimized...\n")
 
-                                    if algorithm not in mean_group and algorithm not in not_optimized:
+                                    if (
+                                        algorithm not in mean_group
+                                        and algorithm not in not_optimized
+                                    ):
                                         if i_opti.parameters is None:
-                                            opti_params = utils.load_parameters(query="optimal", algorithm=algorithm, dataset=dataset, optimizer="e")
+                                            opti_params = utils.load_parameters(
+                                                query="optimal",
+                                                algorithm=algorithm,
+                                                dataset=dataset,
+                                                optimizer="e",
+                                            )
                                             if verbose:
-                                                print("\n6. imputation", algorithm, "with optimal parameters from files", *opti_params)
+                                                print(
+                                                    "\n6. imputation",
+                                                    algorithm,
+                                                    "with optimal parameters from files",
+                                                    *opti_params,
+                                                )
                                         else:
                                             opti_params = i_opti.parameters
                                             if verbose:
-                                                print("\n6. imputation", algorithm, "with optimal parameters from object", *opti_params)
+                                                print(
+                                                    "\n6. imputation",
+                                                    algorithm,
+                                                    "with optimal parameters from object",
+                                                    *opti_params,
+                                                )
                                     else:
                                         if verbose:
-                                            print("\n5. No AutoML launches without optimal params for", algorithm, "\n")
+                                            print(
+                                                "\n5. No AutoML launches without optimal params for",
+                                                algorithm,
+                                                "\n",
+                                            )
                                         opti_params = None
                                 else:
                                     if verbose:
-                                        print("\n5. Default parameters have been set the parameters", optimizer, "for", algorithm, "\n")
+                                        print(
+                                            "\n5. Default parameters have been set the parameters",
+                                            optimizer,
+                                            "for",
+                                            algorithm,
+                                            "\n",
+                                        )
                                     optimizer_value = optimizer
                                     opti_params = None
 
                                 start_time_imputation = time.time()
 
-                                if not self._benchmark_exception(dataset, algorithm, pattern, x):
-                                    if utils.check_family("DeepLearning", algorithm) or utils.check_family("LLMs", algorithm):
-                                        if x > round(1-dl_ratio, 2):
+                                if not self._benchmark_exception(
+                                    dataset, algorithm, pattern, x
+                                ):
+                                    if utils.check_family(
+                                        "DeepLearning", algorithm
+                                    ) or utils.check_family("LLMs", algorithm):
+                                        if x > round(1 - dl_ratio, 2):
+                                            print(
+                                                f"\nImputation skipped for {algorithm} at contamination rate {x} due to insufficient training data (requires at least {dl_ratio * 100}% data available).\n"
+                                            )
                                             algo.recov_data = incomp_data
                                         else:
-                                            algo.impute(params=opti_params, tr_ratio=dl_ratio)
+                                            algo.impute(
+                                                params=opti_params, tr_ratio=dl_ratio
+                                            )
                                     else:
                                         algo.impute(params=opti_params)
                                 else:
@@ -950,15 +1208,29 @@ class Benchmark:
 
                                 end_time_imputation = time.time()
 
-                                algo.score(input_data=ts_test.data, recov_data=algo.recov_data, verbose=False)
+                                algo.score(
+                                    input_data=ts_test.data,
+                                    recov_data=algo.recov_data,
+                                    verbose=False,
+                                )
 
                                 if "*" not in metrics and "all" not in metrics:
-                                    algo.metrics = {k: algo.metrics[k] for k in metrics if k in algo.metrics}
+                                    algo.metrics = {
+                                        k: algo.metrics[k]
+                                        for k in metrics
+                                        if k in algo.metrics
+                                    }
 
-                                time_imputation = (end_time_imputation - start_time_imputation) * 1000
+                                time_imputation = (
+                                    end_time_imputation - start_time_imputation
+                                ) * 1000
                                 if time_imputation < 1:
                                     time_imputation = 1
-                                log_time_imputation = math.log10(time_imputation) if time_imputation > 0 else None
+                                log_time_imputation = (
+                                    math.log10(time_imputation)
+                                    if time_imputation > 0
+                                    else None
+                                )
 
                                 algo.metrics["RUNTIME"] = time_imputation
                                 algo.metrics["RUNTIME_LOG"] = log_time_imputation
@@ -967,28 +1239,59 @@ class Benchmark:
                                 if "-" in dataset:
                                     dataset_s = dataset.replace("-", "")
 
-                                save_dir_plot = save_dir + "/" + dataset_s + "/" + pattern + "/recovery/"
-                                cont_rate = int(x*100)
-                                ts_test.plot(input_data=ts_test.data, incomp_data=incomp_data, recov_data=algo.recov_data, nbr_series=3, subplot=True, algorithm=algo.algorithm, cont_rate=str(cont_rate), display=False, save_path=save_dir_plot, verbose=False)
+                                save_dir_plot = (
+                                    save_dir
+                                    + "/"
+                                    + dataset_s
+                                    + "/"
+                                    + pattern
+                                    + "/recovery/"
+                                )
+                                cont_rate = int(x * 100)
+                                ts_test.plot(
+                                    input_data=ts_test.data,
+                                    incomp_data=incomp_data,
+                                    recov_data=algo.recov_data,
+                                    nbr_series=3,
+                                    subplot=True,
+                                    algorithm=algo.algorithm,
+                                    cont_rate=str(cont_rate),
+                                    display=False,
+                                    save_path=save_dir_plot,
+                                    verbose=False,
+                                )
 
-                                runs_plots_scores.setdefault(str(dataset_s), {}).setdefault(str(pattern), {}).setdefault(str(algorithm), {}).setdefault(str(optimizer_value), {})[str(x)] = {"scores": algo.metrics}
+                                runs_plots_scores.setdefault(
+                                    str(dataset_s), {}
+                                ).setdefault(str(pattern), {}).setdefault(
+                                    str(algorithm), {}
+                                ).setdefault(str(optimizer_value), {})[str(x)] = {
+                                    "scores": algo.metrics
+                                }
 
-                        print(f"done!\n\n")
-                #save_dir_runs = save_dir + "/_details/run_" + str(i_run) + "/" + dataset
-                #if verbose:
+                        print("done!\n\n")
+                # save_dir_runs = save_dir + "/_details/run_" + str(i_run) + "/" + dataset
+                # if verbose:
                 #    print("\nruns saved in : ", save_dir_runs)
-                #self.generate_plots(runs_plots_scores=runs_plots_scores, ticks=x_axis, metrics=metrics, subplot=True, y_size=y_p_size, save_dir=save_dir_runs, display=False, verbose=verbose)
-                #self.generate_plots(runs_plots_scores=runs_plots_scores, ticks=x_axis, metrics=metrics, subplot=False, y_size=y_p_size, save_dir=save_dir_runs, display=False, verbose=verbose)
-                #self.generate_reports_txt(runs_plots_scores=runs_plots_scores, save_dir=save_dir_runs, dataset=dataset, metrics=metrics, run=i_run, verbose=verbose)
-                #self.generate_reports_excel(runs_plots_scores, save_dir_runs, dataset, i_run, verbose=verbose)
+                # self.generate_plots(runs_plots_scores=runs_plots_scores, ticks=x_axis, metrics=metrics, subplot=True, y_size=y_p_size, save_dir=save_dir_runs, display=False, verbose=verbose)
+                # self.generate_plots(runs_plots_scores=runs_plots_scores, ticks=x_axis, metrics=metrics, subplot=False, y_size=y_p_size, save_dir=save_dir_runs, display=False, verbose=verbose)
+                # self.generate_reports_txt(runs_plots_scores=runs_plots_scores, save_dir=save_dir_runs, dataset=dataset, metrics=metrics, run=i_run, verbose=verbose)
+                # self.generate_reports_excel(runs_plots_scores, save_dir_runs, dataset, i_run, verbose=verbose)
                 run_storage.append(runs_plots_scores)
 
-        plt.close('all')  # Close all open figures
+        plt.close("all")  # Close all open figures
 
         for x, m in enumerate(reversed(metrics)):
-            #tag = True if x == (len(metrics)-1) else False
+            # tag = True if x == (len(metrics)-1) else False
             scores_list, algos, sets = self.avg_results(*run_storage, metric=m)
-            _ = self.generate_heatmap(scores_list=scores_list, algos=algos, sets=sets, metric=m, save_dir=save_dir, display=False)
+            _ = self.generate_heatmap(
+                scores_list=scores_list,
+                algos=algos,
+                sets=sets,
+                metric=m,
+                save_dir=save_dir,
+                display=False,
+            )
 
         run_averaged = self.average_runs_by_names(run_storage)
 
@@ -1003,8 +1306,23 @@ class Benchmark:
             dataset_name = str(all_keys[0])
             save_dir_agg_set = save_dir + "/" + dataset_name
 
-            self.generate_reports_txt(runs_plots_scores=scores, save_dir=save_dir_agg_set, dataset=dataset_name, metrics=metrics, rt=total_time_benchmark, run=-1)
-            self.generate_plots(runs_plots_scores=scores, ticks=x_axis, metrics=metrics, subplot=True, y_size=y_p_size, save_dir=save_dir_agg_set, display=verb)
+            self.generate_reports_txt(
+                runs_plots_scores=scores,
+                save_dir=save_dir_agg_set,
+                dataset=dataset_name,
+                metrics=metrics,
+                rt=total_time_benchmark,
+                run=-1,
+            )
+            self.generate_plots(
+                runs_plots_scores=scores,
+                ticks=x_axis,
+                metrics=metrics,
+                subplot=True,
+                y_size=y_p_size,
+                save_dir=save_dir_agg_set,
+                display=verb,
+            )
 
         print("\nThe results are saved in : ", save_dir, "\n")
         self.list_results = run_averaged

@@ -1,11 +1,35 @@
 import re
-from imputegap.tools import utils
+
 from imputegap.recovery.downstream import Downstream
 from imputegap.recovery.evaluation import Evaluation
+from imputegap.tools import utils
 
-not_optimized = ["knn", "interpolation", "iterative_svd", "grouse", "dynammo", "rosl", "soft_impute", "spirit", "svt",
-                 "tkcm", "deep_mvi", "brits", "mpin", "pristi", "bay_otide", "bit_graph", "gain", "grin", "hkmf_t",
-                 "mice", "miss_forest", "miss_net", "trmf", "xgboost"]
+not_optimized = [
+    "knn",
+    "interpolation",
+    "iterative_svd",
+    "grouse",
+    "dynammo",
+    "rosl",
+    "soft_impute",
+    "spirit",
+    "svt",
+    "tkcm",
+    "deep_mvi",
+    "brits",
+    "mpin",
+    "pristi",
+    "bay_otide",
+    "bit_graph",
+    "gain",
+    "ReCTSi",
+    "hkmf_t",
+    "mice",
+    "miss_forest",
+    "miss_net",
+    "trmf",
+    "xgboost",
+]
 
 
 class BaseImputer:
@@ -26,6 +50,7 @@ class BaseImputer:
     _optimize(parameters={}):
         Optimize hyperparameters for the imputation algorithm.
     """
+
     algorithm = ""
     logs = True
     verbose = True
@@ -92,11 +117,19 @@ class BaseImputer:
             self.recov_data = recov_data
 
         if isinstance(downstream, dict) and downstream is not None:
-            self.downstream_metrics, self.downstream_plot = Downstream(input_data, self.recov_data, self.incomp_data, self.algorithm, downstream).downstream_analysis()
+            self.downstream_metrics, self.downstream_plot = Downstream(
+                input_data,
+                self.recov_data,
+                self.incomp_data,
+                self.algorithm,
+                downstream,
+            ).downstream_analysis()
         else:
-            self.metrics = Evaluation(input_data, self.recov_data, self.incomp_data, self.algorithm, verbose).compute_all_metrics()
+            self.metrics = Evaluation(
+                input_data, self.recov_data, self.incomp_data, self.algorithm, verbose
+            ).compute_all_metrics()
 
-    def _check_params(self, user_def, params):
+    def _check_params(self, user_def, params) -> tuple:
         """
         Format the parameters for optimization or imputation.
 
@@ -129,14 +162,21 @@ class BaseImputer:
             if self.algorithm == "iim":
                 if len(self.parameters) == 1:
                     learning_neighbours = self.parameters[0]
-                    algo_code = "iim " + re.sub(r'[\W_]', '', str(learning_neighbours))
+                    algo_code = "iim " + re.sub(r"[\W_]", "", str(learning_neighbours))
                     self.parameters = (learning_neighbours, algo_code)
 
             if self.algorithm == "mrnn":
                 if len(self.parameters) == 3:
                     hidden_dim, learning_rate, iterations = self.parameters
-                    _, _, _, sequence_length = utils.load_parameters(query="default", algorithm="mrnn")
-                    self.parameters = (hidden_dim, learning_rate, iterations, sequence_length)
+                    _, _, _, sequence_length = utils.load_parameters(
+                        query="default", algorithm="mrnn"
+                    )
+                    self.parameters = (
+                        hidden_dim,
+                        learning_rate,
+                        iterations,
+                        sequence_length,
+                    )
 
         return self.parameters
 
@@ -155,7 +195,7 @@ class BaseImputer:
         """
         from imputegap.recovery.optimization import Optimization
 
-        optimizer = parameters.get('optimizer', "ray_tune")
+        optimizer = parameters.get("optimizer", "ray_tune")
 
         if self.algorithm in not_optimized and optimizer != "ray_tune":
             raise ValueError(
@@ -165,102 +205,154 @@ class BaseImputer:
             )
 
         input_data = (
-            parameters.get('input_data') if parameters.get('input_data') is not None else
-            parameters.get('input') if parameters.get('input') is not None else
-            parameters.get('data') if parameters.get('data') is not None else
-            parameters.get('ts_input')
+            parameters.get("input_data")
+            if parameters.get("input_data") is not None
+            else parameters.get("input")
+            if parameters.get("input") is not None
+            else parameters.get("data")
+            if parameters.get("data") is not None
+            else parameters.get("ts_input")
         )
         if input_data is None:
-            raise ValueError(f"Need input_data to be able to adapt the hyper-parameters: {input_data}")
+            raise ValueError(
+                f"Need input_data to be able to adapt the hyper-parameters: {input_data}"
+            )
 
         defaults = utils.load_parameters(query="default", algorithm=optimizer)
 
-        print("\n(OPTI) optimizer", optimizer, "has been called with", self.algorithm, "...\n")
+        print(
+            "\n(OPTI) optimizer",
+            optimizer,
+            "has been called with",
+            self.algorithm,
+            "...\n",
+        )
 
         if optimizer.lower() in ["bayesian", "bo", "bayesopt"]:
             n_calls_d, n_random_starts_d, acq_func_d, selected_metrics_d = defaults
-            options = parameters.get('options', {})
+            options = parameters.get("options", {})
 
-            n_calls = options.get('n_calls', n_calls_d)
-            random_starts = options.get('n_random_starts', n_random_starts_d)
-            func = options.get('acq_func', acq_func_d)
-            metrics = options.get('metrics', selected_metrics_d)
+            n_calls = options.get("n_calls", n_calls_d)
+            random_starts = options.get("n_random_starts", n_random_starts_d)
+            func = options.get("acq_func", acq_func_d)
+            metrics = options.get("metrics", selected_metrics_d)
 
             bo_optimizer = Optimization.Bayesian()
 
-            optimal_params, _ = bo_optimizer.optimize(input_data=input_data,
-                                                      incomp_data=self.incomp_data,
-                                                      metrics=metrics,
-                                                      algorithm=self.algorithm,
-                                                      n_calls=n_calls,
-                                                      n_random_starts=random_starts,
-                                                      acq_func=func)
+            optimal_params, _ = bo_optimizer.optimize(
+                input_data=input_data,
+                incomp_data=self.incomp_data,
+                metrics=metrics,
+                algorithm=self.algorithm,
+                n_calls=n_calls,
+                n_random_starts=random_starts,
+                acq_func=func,
+            )
 
             if optimal_params is None:
-                print("\n(OPTI) optimization does not find results for ", self.algorithm, " > load default params.\n")
-                optimal_params = utils.load_parameters(query="default", algorithm=self.algorithm)
+                print(
+                    "\n(OPTI) optimization does not find results for ",
+                    self.algorithm,
+                    " > load default params.\n",
+                )
+                optimal_params = utils.load_parameters(
+                    query="default", algorithm=self.algorithm
+                )
 
         elif optimizer.lower() in ["pso", "particle_swarm"]:
-            n_particles_d, c1_d, c2_d, w_d, iterations_d, n_processes_d, selected_metrics_d = defaults
-            options = parameters.get('options', {})
+            (
+                n_particles_d,
+                c1_d,
+                c2_d,
+                w_d,
+                iterations_d,
+                n_processes_d,
+                selected_metrics_d,
+            ) = defaults
+            options = parameters.get("options", {})
 
-            n_particles = options.get('n_particles', n_particles_d)
-            c1 = options.get('c1', c1_d)
-            c2 = options.get('c2', c2_d)
-            w = options.get('w', w_d)
-            iterations = options.get('iterations', iterations_d)
-            n_processes = options.get('n_processes', n_processes_d)
-            metrics = options.get('metrics', selected_metrics_d)
+            n_particles = options.get("n_particles", n_particles_d)
+            c1 = options.get("c1", c1_d)
+            c2 = options.get("c2", c2_d)
+            w = options.get("w", w_d)
+            iterations = options.get("iterations", iterations_d)
+            n_processes = options.get("n_processes", n_processes_d)
+            metrics = options.get("metrics", selected_metrics_d)
 
             swarm_optimizer = Optimization.ParticleSwarm()
 
-            optimal_params, _ = swarm_optimizer.optimize(input_data=input_data,
-                                                         incomp_data=self.incomp_data,
-                                                         metrics=metrics, algorithm=self.algorithm,
-                                                         n_particles=n_particles, c1=c1, c2=c2, w=w,
-                                                         iterations=iterations, n_processes=n_processes)
+            optimal_params, _ = swarm_optimizer.optimize(
+                input_data=input_data,
+                incomp_data=self.incomp_data,
+                metrics=metrics,
+                algorithm=self.algorithm,
+                n_particles=n_particles,
+                c1=c1,
+                c2=c2,
+                w=w,
+                iterations=iterations,
+                n_processes=n_processes,
+            )
 
         elif optimizer.lower() in ["sh", "successive_halving"]:
-            num_configs_d, num_iterations_d, reduction_factor_d, selected_metrics_d = defaults
-            options = parameters.get('options', {})
+            num_configs_d, num_iterations_d, reduction_factor_d, selected_metrics_d = (
+                defaults
+            )
+            options = parameters.get("options", {})
 
-            num_configs = options.get('num_configs', num_configs_d)
-            num_iterations = options.get('num_iterations', num_iterations_d)
-            reduction_factor = options.get('reduction_factor', reduction_factor_d)
-            metrics = options.get('metrics', selected_metrics_d)
+            num_configs = options.get("num_configs", num_configs_d)
+            num_iterations = options.get("num_iterations", num_iterations_d)
+            reduction_factor = options.get("reduction_factor", reduction_factor_d)
+            metrics = options.get("metrics", selected_metrics_d)
 
             sh_optimizer = Optimization.SuccessiveHalving()
 
-            optimal_params, _ = sh_optimizer.optimize(input_data=input_data,
-                                                      incomp_data=self.incomp_data,
-                                                      metrics=metrics, algorithm=self.algorithm,
-                                                      num_configs=num_configs, num_iterations=num_iterations,
-                                                      reduction_factor=reduction_factor)
+            optimal_params, _ = sh_optimizer.optimize(
+                input_data=input_data,
+                incomp_data=self.incomp_data,
+                metrics=metrics,
+                algorithm=self.algorithm,
+                num_configs=num_configs,
+                num_iterations=num_iterations,
+                reduction_factor=reduction_factor,
+            )
 
         elif optimizer.lower() in ["ray_tune", "ray"]:
             selected_metrics_d, n_calls_d, max_concurrent_trials_d = defaults
 
-            options = parameters.get('options', {})
-            n_calls = options.get('n_calls', n_calls_d)
-            max_concurrent_trials = options.get('max_concurrent_trials', max_concurrent_trials_d)
-            metrics = options.get('metrics', selected_metrics_d)
+            options = parameters.get("options", {})
+            n_calls = options.get("n_calls", n_calls_d)
+            max_concurrent_trials = options.get(
+                "max_concurrent_trials", max_concurrent_trials_d
+            )
+            metrics = options.get("metrics", selected_metrics_d)
 
             ray_tune_optimizer = Optimization.RayTune()
-            optimal_params = ray_tune_optimizer.optimize(input_data=input_data, incomp_data=self.incomp_data, metrics=metrics, algorithm=self.algorithm, n_calls=n_calls, max_concurrent_trials=max_concurrent_trials)
+            optimal_params = ray_tune_optimizer.optimize(
+                input_data=input_data,
+                incomp_data=self.incomp_data,
+                metrics=metrics,
+                algorithm=self.algorithm,
+                n_calls=n_calls,
+                max_concurrent_trials=max_concurrent_trials,
+            )
 
         else:
             n_calls_d, selected_metrics_d = defaults
-            options = parameters.get('options', {})
+            options = parameters.get("options", {})
 
-            n_calls = options.get('n_calls', n_calls_d)
-            metrics = options.get('metrics', selected_metrics_d)
+            n_calls = options.get("n_calls", n_calls_d)
+            metrics = options.get("metrics", selected_metrics_d)
 
             go_optimizer = Optimization.Greedy()
 
-            optimal_params, _ = go_optimizer.optimize(input_data=input_data,
-                                                      incomp_data=self.incomp_data,
-                                                      metrics=metrics, algorithm=self.algorithm,
-                                                      n_calls=n_calls)
+            optimal_params, _ = go_optimizer.optimize(
+                input_data=input_data,
+                incomp_data=self.incomp_data,
+                metrics=metrics,
+                algorithm=self.algorithm,
+                n_calls=n_calls,
+            )
 
         self.parameters = optimal_params
 
@@ -285,8 +377,10 @@ class BaseImputer:
         if missing_ratio <= ratio:
             return True
         else:
-            print(f"\n(IMP) The proportion of missing values {missing_ratio*100}% is too high to train an effective deep learning model, limited to {int(round(ratio*100))}%.\n"
-                  "Please consider reducing the contamination rate or selecting a different family of imputation methods")
+            print(
+                f"\n(IMP) The proportion of missing values {missing_ratio * 100}% is too high to train an effective deep learning model, limited to {int(round(ratio * 100))}%.\n"
+                "Please consider reducing the contamination rate or selecting a different family of imputation methods"
+            )
             return False
 
 
@@ -324,37 +418,55 @@ class Imputation:
         if isinstance(configuration, dict):
             configuration = tuple(configuration.values())
 
-        if algorithm == 'cdrec':
+        if algorithm == "cdrec":
             rank, epsilon, iterations = configuration
             algo = Imputation.MatrixCompletion.CDRec(incomp_data)
             algo.logs = False
-            algo.impute(user_def=True, params={"rank": rank, "epsilon": epsilon, "iterations": iterations})
+            algo.impute(
+                user_def=True,
+                params={"rank": rank, "epsilon": epsilon, "iterations": iterations},
+            )
 
-        elif algorithm == 'iim':
+        elif algorithm == "iim":
             if not isinstance(configuration, list):
                 configuration = [configuration]
             learning_neighbours = configuration[0]
-            alg_code = "iim " + re.sub(r'[\W_]', '', str(learning_neighbours))
+            alg_code = "iim " + re.sub(r"[\W_]", "", str(learning_neighbours))
 
             algo = Imputation.MachineLearning.IIM(incomp_data)
             algo.logs = False
-            algo.impute(user_def=True, params={"learning_neighbours": learning_neighbours, "alg_code": alg_code})
+            algo.impute(
+                user_def=True,
+                params={
+                    "learning_neighbours": learning_neighbours,
+                    "alg_code": alg_code,
+                },
+            )
 
-        elif algorithm == 'mrnn':
+        elif algorithm == "mrnn":
             hidden_dim, learning_rate, iterations = configuration
 
             algo = Imputation.DeepLearning.MRNN(incomp_data)
             algo.logs = False
-            algo.impute(user_def=True,
-                        params={"hidden_dim": hidden_dim, "learning_rate": learning_rate, "iterations": iterations,
-                                "seq_length": 7})
+            algo.impute(
+                user_def=True,
+                params={
+                    "hidden_dim": hidden_dim,
+                    "learning_rate": learning_rate,
+                    "iterations": iterations,
+                    "seq_length": 7,
+                },
+            )
 
-        elif algorithm == 'stmvl':
+        elif algorithm == "stmvl":
             window_size, gamma, alpha = configuration
 
             algo = Imputation.PatternSearch.STMVL(incomp_data)
             algo.logs = False
-            algo.impute(user_def=True, params={"window_size": window_size, "gamma": gamma, "alpha": alpha})
+            algo.impute(
+                user_def=True,
+                params={"window_size": window_size, "gamma": gamma, "alpha": alpha},
+            )
 
         else:
             raise ValueError(f"Invalid algorithm: {algorithm}")
@@ -391,6 +503,7 @@ class Imputation:
             impute(self, params=None):
                 Perform imputation by replacing missing values with zeros.
             """
+
             algorithm = "zero_impute"
 
             def impute(self, params=None):
@@ -423,6 +536,7 @@ class Imputation:
             impute(self, params=None):
                 Perform imputation by replacing missing values with the mean value of the ground truth.
             """
+
             algorithm = "mean_impute"
 
             def impute(self, params=None):
@@ -455,6 +569,7 @@ class Imputation:
             impute(self, params=None):
                 Perform imputation by replacing missing values with the minimum value of the ground truth.
             """
+
             algorithm = "min_impute"
 
             def impute(self, params=None):
@@ -487,6 +602,7 @@ class Imputation:
             impute(self, params=None):
                 Perform imputation by replacing missing values with the mean value by series
             """
+
             algorithm = "mean_impute"
 
             def impute(self, params=None):
@@ -498,9 +614,13 @@ class Imputation:
                 self : MeanImputeBySeries
                     The object with `recov_data` set.
                 """
-                from imputegap.algorithms.mean_impute_by_series import mean_impute_by_series
+                from imputegap.algorithms.mean_impute_by_series import (
+                    mean_impute_by_series,
+                )
 
-                self.recov_data = mean_impute_by_series(self.incomp_data, logs=self.logs, verbose=self.verbose)
+                self.recov_data = mean_impute_by_series(
+                    self.incomp_data, logs=self.logs, verbose=self.verbose
+                )
 
                 return self
 
@@ -513,6 +633,7 @@ class Imputation:
             impute(self, params=None):
                 Perform imputation by replacing missing values with zeros.
             """
+
             algorithm = "test"
 
             def impute(self, params=None):
@@ -545,6 +666,7 @@ class Imputation:
             impute(self, params=None):
                 Perform imputation by replacing missing values with interpolation-based algorithm
             """
+
             algorithm = "interpolation"
 
             def impute(self, user_def=True, params=None):
@@ -576,12 +698,19 @@ class Imputation:
                 if params is not None:
                     method, poly_order = self._check_params(user_def, params)
                 else:
-                    method, poly_order = utils.load_parameters(query="default", algorithm=self.algorithm, verbose=self.verbose)
+                    method, poly_order = utils.load_parameters(
+                        query="default", algorithm=self.algorithm, verbose=self.verbose
+                    )
 
-                self.recov_data = interpolation(incomp_data=self.incomp_data, method=method, poly_order=poly_order, logs=self.logs, verbose=self.verbose)
+                self.recov_data = interpolation(
+                    incomp_data=self.incomp_data,
+                    method=method,
+                    poly_order=poly_order,
+                    logs=self.logs,
+                    verbose=self.verbose,
+                )
 
                 return self
-
 
         class KNNImpute(BaseImputer):
             """
@@ -592,6 +721,7 @@ class Imputation:
             impute(self, params=None):
                 Perform imputation by replacing missing values with K-Nearest Neighbor
             """
+
             algorithm = "knn_impute"
 
             def impute(self, user_def=True, params=None):
@@ -630,17 +760,23 @@ class Imputation:
                 if params is not None:
                     k, weights = self._check_params(user_def, params)
                 else:
-                    k, weights = utils.load_parameters(query="default", algorithm=self.algorithm, verbose=self.verbose)
+                    k, weights = utils.load_parameters(
+                        query="default", algorithm=self.algorithm, verbose=self.verbose
+                    )
 
-                k = utils.compute_rank_check(M=self.incomp_data.shape[0], rank=k, verbose=self.verbose)
+                k = utils.compute_rank_check(
+                    M=self.incomp_data.shape[0], rank=k, verbose=self.verbose
+                )
 
-                self.recov_data = knn(incomp_data=self.incomp_data, k=k, weights=weights, logs=self.logs, verbose=self.verbose)
+                self.recov_data = knn(
+                    incomp_data=self.incomp_data,
+                    k=k,
+                    weights=weights,
+                    logs=self.logs,
+                    verbose=self.verbose,
+                )
 
                 return self
-
-
-
-
 
     class MatrixCompletion:
         """
@@ -780,11 +916,22 @@ class Imputation:
                 if params is not None:
                     rank, epsilon, iterations = self._check_params(user_def, params)
                 else:
-                    rank, epsilon, iterations = utils.load_parameters(query="default", algorithm=self.algorithm, verbose=False)
+                    rank, epsilon, iterations = utils.load_parameters(
+                        query="default", algorithm=self.algorithm, verbose=False
+                    )
 
-                rank = utils.compute_rank_check(M=self.incomp_data.shape[0], rank=rank, verbose=self.verbose)
+                rank = utils.compute_rank_check(
+                    M=self.incomp_data.shape[0], rank=rank, verbose=self.verbose
+                )
 
-                self.recov_data = cdrec(incomp_data=self.incomp_data, truncation_rank=rank, iterations=iterations, epsilon=epsilon, logs=self.logs, verbose=self.verbose)
+                self.recov_data = cdrec(
+                    incomp_data=self.incomp_data,
+                    truncation_rank=rank,
+                    iterations=iterations,
+                    epsilon=epsilon,
+                    logs=self.logs,
+                    verbose=self.verbose,
+                )
 
                 return self
 
@@ -838,13 +985,22 @@ class Imputation:
                 from imputegap.algorithms.iterative_svd import iterative_svd
 
                 if params is not None:
-                    rank  = self._check_params(user_def, params)[0]
+                    rank = self._check_params(user_def, params)[0]
                 else:
-                    rank = utils.load_parameters(query="default", algorithm=self.algorithm, verbose=self.verbose)
+                    rank = utils.load_parameters(
+                        query="default", algorithm=self.algorithm, verbose=self.verbose
+                    )
 
-                rank = utils.compute_rank_check(M=self.incomp_data.shape[0], rank=rank, verbose=self.verbose)
+                rank = utils.compute_rank_check(
+                    M=self.incomp_data.shape[0], rank=rank, verbose=self.verbose
+                )
 
-                self.recov_data = iterative_svd(incomp_data=self.incomp_data, truncation_rank=rank, logs=self.logs, verbose=self.verbose)
+                self.recov_data = iterative_svd(
+                    incomp_data=self.incomp_data,
+                    truncation_rank=rank,
+                    logs=self.logs,
+                    verbose=self.verbose,
+                )
 
                 return self
 
@@ -898,13 +1054,22 @@ class Imputation:
                 from imputegap.algorithms.grouse import grouse
 
                 if params is not None:
-                    max_rank  = self._check_params(user_def, params)[0]
+                    max_rank = self._check_params(user_def, params)[0]
                 else:
-                    max_rank = utils.load_parameters(query="default", algorithm=self.algorithm, verbose=self.verbose)
+                    max_rank = utils.load_parameters(
+                        query="default", algorithm=self.algorithm, verbose=self.verbose
+                    )
 
-                max_rank = utils.compute_rank_check(M=self.incomp_data.shape[0], rank=max_rank, verbose=self.verbose)
+                max_rank = utils.compute_rank_check(
+                    M=self.incomp_data.shape[0], rank=max_rank, verbose=self.verbose
+                )
 
-                self.recov_data = grouse(incomp_data=self.incomp_data, max_rank=max_rank, logs=self.logs, verbose=self.verbose)
+                self.recov_data = grouse(
+                    incomp_data=self.incomp_data,
+                    max_rank=max_rank,
+                    logs=self.logs,
+                    verbose=self.verbose,
+                )
 
                 return self
 
@@ -963,11 +1128,21 @@ class Imputation:
                 if params is not None:
                     rank, regularization = self._check_params(user_def, params)
                 else:
-                    rank, regularization = utils.load_parameters(query="default", algorithm=self.algorithm, verbose=self.verbose)
+                    rank, regularization = utils.load_parameters(
+                        query="default", algorithm=self.algorithm, verbose=self.verbose
+                    )
 
-                rank = utils.compute_rank_check(M=self.incomp_data.shape[0], rank=rank, verbose=self.verbose)
+                rank = utils.compute_rank_check(
+                    M=self.incomp_data.shape[0], rank=rank, verbose=self.verbose
+                )
 
-                self.recov_data = rosl(incomp_data=self.incomp_data, rank=rank, regularization=regularization, logs=self.logs, verbose=self.verbose)
+                self.recov_data = rosl(
+                    incomp_data=self.incomp_data,
+                    rank=rank,
+                    regularization=regularization,
+                    logs=self.logs,
+                    verbose=self.verbose,
+                )
 
                 return self
 
@@ -1023,14 +1198,22 @@ class Imputation:
                 if params is not None:
                     max_rank = self._check_params(user_def, params)[0]
                 else:
-                    max_rank = utils.load_parameters(query="default", algorithm=self.algorithm, verbose=self.verbose)
+                    max_rank = utils.load_parameters(
+                        query="default", algorithm=self.algorithm, verbose=self.verbose
+                    )
 
-                max_rank = utils.compute_rank_check(M=self.incomp_data.shape[0], rank=max_rank, verbose=self.verbose)
+                max_rank = utils.compute_rank_check(
+                    M=self.incomp_data.shape[0], rank=max_rank, verbose=self.verbose
+                )
 
-                self.recov_data = soft_impute(incomp_data=self.incomp_data, max_rank=max_rank, logs=self.logs, verbose=self.verbose)
+                self.recov_data = soft_impute(
+                    incomp_data=self.incomp_data,
+                    max_rank=max_rank,
+                    logs=self.logs,
+                    verbose=self.verbose,
+                )
 
                 return self
-
 
         class SPIRIT(BaseImputer):
             """
@@ -1090,9 +1273,18 @@ class Imputation:
                 if params is not None:
                     k, w, lambda_value = self._check_params(user_def, params)
                 else:
-                    k, w, lambda_value = utils.load_parameters(query="default", algorithm=self.algorithm, verbose=self.verbose)
+                    k, w, lambda_value = utils.load_parameters(
+                        query="default", algorithm=self.algorithm, verbose=self.verbose
+                    )
 
-                self.recov_data = spirit(incomp_data=self.incomp_data, k=k, w=w, lambda_value=lambda_value, logs=self.logs, verbose=self.verbose)
+                self.recov_data = spirit(
+                    incomp_data=self.incomp_data,
+                    k=k,
+                    w=w,
+                    lambda_value=lambda_value,
+                    logs=self.logs,
+                    verbose=self.verbose,
+                )
 
                 return self
 
@@ -1149,9 +1341,16 @@ class Imputation:
                 if params is not None:
                     tau = self._check_params(user_def, params)[0]
                 else:
-                    tau = utils.load_parameters(query="default", algorithm=self.algorithm, verbose=self.verbose)
+                    tau = utils.load_parameters(
+                        query="default", algorithm=self.algorithm, verbose=self.verbose
+                    )
 
-                self.recov_data = svt(incomp_data=self.incomp_data, tau=tau, logs=self.logs, verbose=self.verbose)
+                self.recov_data = svt(
+                    incomp_data=self.incomp_data,
+                    tau=tau,
+                    logs=self.logs,
+                    verbose=self.verbose,
+                )
 
                 return self
 
@@ -1222,17 +1421,33 @@ class Imputation:
                 from imputegap.algorithms.trmf import trmf
 
                 if params is not None:
-                    lags, K, lambda_f, lambda_x, lambda_w, eta, alpha, max_iter = self._check_params(user_def, params)
+                    lags, K, lambda_f, lambda_x, lambda_w, eta, alpha, max_iter = (
+                        self._check_params(user_def, params)
+                    )
                 else:
-                    lags, K, lambda_f, lambda_x, lambda_w, eta, alpha, max_iter = utils.load_parameters(query="default", algorithm=self.algorithm, verbose=self.verbose)
+                    lags, K, lambda_f, lambda_x, lambda_w, eta, alpha, max_iter = (
+                        utils.load_parameters(
+                            query="default",
+                            algorithm=self.algorithm,
+                            verbose=self.verbose,
+                        )
+                    )
 
-                self.recov_data = trmf(incomp_data=self.incomp_data, lags=lags, K=K, lambda_f=lambda_f, lambda_x=lambda_x, lambda_w=lambda_w, eta=eta, alpha=alpha, max_iter=max_iter, logs=self.logs, verbose=self.verbose)
+                self.recov_data = trmf(
+                    incomp_data=self.incomp_data,
+                    lags=lags,
+                    K=K,
+                    lambda_f=lambda_f,
+                    lambda_x=lambda_x,
+                    lambda_w=lambda_w,
+                    eta=eta,
+                    alpha=alpha,
+                    max_iter=max_iter,
+                    logs=self.logs,
+                    verbose=self.verbose,
+                )
 
                 return self
-
-
-
-
 
     class MachineLearning:
         """
@@ -1259,6 +1474,7 @@ class Imputation:
             impute(self, user_def=True, params=None):
                 Perform imputation using the Miss Forest algorithm.
             """
+
             algorithm = "miss_forest"
 
             def impute(self, user_def=True, params=None):
@@ -1312,14 +1528,25 @@ class Imputation:
                 from imputegap.algorithms.miss_forest import miss_forest
 
                 if params is not None:
-                    n_estimators, max_iter, max_features, seed = self._check_params(user_def, params)
+                    n_estimators, max_iter, max_features, seed = self._check_params(
+                        user_def, params
+                    )
                 else:
-                    n_estimators, max_iter, max_features, seed = utils.load_parameters(query="default", algorithm=self.algorithm, verbose=self.verbose)
+                    n_estimators, max_iter, max_features, seed = utils.load_parameters(
+                        query="default", algorithm=self.algorithm, verbose=self.verbose
+                    )
 
-                self.recov_data = miss_forest(incomp_data=self.incomp_data, n_estimators=n_estimators, max_iter=max_iter, max_features=max_features, seed=seed, logs=self.logs, verbose=self.verbose)
+                self.recov_data = miss_forest(
+                    incomp_data=self.incomp_data,
+                    n_estimators=n_estimators,
+                    max_iter=max_iter,
+                    max_features=max_features,
+                    seed=seed,
+                    logs=self.logs,
+                    verbose=self.verbose,
+                )
 
                 return self
-
 
         class MICE(BaseImputer):
             """
@@ -1330,6 +1557,7 @@ class Imputation:
             impute(self, user_def=True, params=None):
                 Perform imputation using the MICE algorithm.
             """
+
             algorithm = "mice"
 
             def impute(self, user_def=True, params=None):
@@ -1377,11 +1605,23 @@ class Imputation:
                 from imputegap.algorithms.mice import mice
 
                 if params is not None:
-                    max_iter, tol, initial_strategy, seed = self._check_params(user_def, params)
+                    max_iter, tol, initial_strategy, seed = self._check_params(
+                        user_def, params
+                    )
                 else:
-                    max_iter, tol, initial_strategy, seed = utils.load_parameters(query="default", algorithm=self.algorithm, verbose=self.verbose)
+                    max_iter, tol, initial_strategy, seed = utils.load_parameters(
+                        query="default", algorithm=self.algorithm, verbose=self.verbose
+                    )
 
-                self.recov_data = mice(incomp_data=self.incomp_data, max_iter=max_iter, tol=tol, initial_strategy=initial_strategy, seed=seed, logs=self.logs, verbose=self.verbose)
+                self.recov_data = mice(
+                    incomp_data=self.incomp_data,
+                    max_iter=max_iter,
+                    tol=tol,
+                    initial_strategy=initial_strategy,
+                    seed=seed,
+                    logs=self.logs,
+                    verbose=self.verbose,
+                )
 
                 return self
 
@@ -1394,6 +1634,7 @@ class Imputation:
             impute(self, user_def=True, params=None):
                 Perform imputation using the XGBOOST algorithm.
             """
+
             algorithm = "xgboost"
 
             def impute(self, user_def=True, params=None):
@@ -1438,9 +1679,17 @@ class Imputation:
                 if params is not None:
                     n_estimators, seed = self._check_params(user_def, params)
                 else:
-                    n_estimators, seed = utils.load_parameters(query="default", algorithm=self.algorithm, verbose=self.verbose)
+                    n_estimators, seed = utils.load_parameters(
+                        query="default", algorithm=self.algorithm, verbose=self.verbose
+                    )
 
-                self.recov_data = xgboost(incomp_data=self.incomp_data, n_estimators=n_estimators, seed=seed, logs=self.logs, verbose=self.verbose)
+                self.recov_data = xgboost(
+                    incomp_data=self.incomp_data,
+                    n_estimators=n_estimators,
+                    seed=seed,
+                    logs=self.logs,
+                    verbose=self.verbose,
+                )
 
                 return self
 
@@ -1453,6 +1702,7 @@ class Imputation:
             impute(self, user_def=True, params=None):
                 Perform imputation using the IIM algorithm.
             """
+
             algorithm = "iim"
 
             def impute(self, user_def=True, params=None):
@@ -1494,18 +1744,23 @@ class Imputation:
                 from imputegap.algorithms.iim import iim
 
                 if params is not None:
-                    learning_neighbours, algo_code = self._check_params(user_def, params)
+                    learning_neighbours, algo_code = self._check_params(
+                        user_def, params
+                    )
                 else:
-                    learning_neighbours, algo_code = utils.load_parameters(query="default", algorithm=self.algorithm, verbose=self.verbose)
+                    learning_neighbours, algo_code = utils.load_parameters(
+                        query="default", algorithm=self.algorithm, verbose=self.verbose
+                    )
 
-                self.recov_data = iim(incomp_data=self.incomp_data, number_neighbor=learning_neighbours,
-                                      algo_code=algo_code, logs=self.logs, verbose=self.verbose)
+                self.recov_data = iim(
+                    incomp_data=self.incomp_data,
+                    number_neighbor=learning_neighbours,
+                    algo_code=algo_code,
+                    logs=self.logs,
+                    verbose=self.verbose,
+                )
 
                 return self
-
-
-
-
 
     class PatternSearch:
         """
@@ -1532,6 +1787,7 @@ class Imputation:
             impute(self, user_def=True, params=None):
                 Perform imputation using the STMVL algorithm.
             """
+
             algorithm = "stmvl"
 
             def impute(self, user_def=True, params=None):
@@ -1575,10 +1831,18 @@ class Imputation:
                 if params is not None:
                     window_size, gamma, alpha = self._check_params(user_def, params)
                 else:
-                    window_size, gamma, alpha = utils.load_parameters(query="default", algorithm=self.algorithm, verbose=self.verbose)
+                    window_size, gamma, alpha = utils.load_parameters(
+                        query="default", algorithm=self.algorithm, verbose=self.verbose
+                    )
 
-                self.recov_data = stmvl(incomp_data=self.incomp_data, window_size=window_size, gamma=gamma,
-                                        alpha=alpha, logs=self.logs, verbose=self.verbose)
+                self.recov_data = stmvl(
+                    incomp_data=self.incomp_data,
+                    window_size=window_size,
+                    gamma=gamma,
+                    alpha=alpha,
+                    logs=self.logs,
+                    verbose=self.verbose,
+                )
 
                 return self
 
@@ -1634,11 +1898,22 @@ class Imputation:
                 from imputegap.algorithms.dynammo import dynammo
 
                 if params is not None:
-                    h, max_iteration, approximation = self._check_params(user_def, params)
+                    h, max_iteration, approximation = self._check_params(
+                        user_def, params
+                    )
                 else:
-                    h, max_iteration, approximation = utils.load_parameters(query="default", algorithm=self.algorithm, verbose=self.verbose)
+                    h, max_iteration, approximation = utils.load_parameters(
+                        query="default", algorithm=self.algorithm, verbose=self.verbose
+                    )
 
-                self.recov_data = dynammo(incomp_data=self.incomp_data, h=h, max_iteration=max_iteration, approximation=approximation, logs=self.logs, verbose=self.verbose)
+                self.recov_data = dynammo(
+                    incomp_data=self.incomp_data,
+                    h=h,
+                    max_iteration=max_iteration,
+                    approximation=approximation,
+                    logs=self.logs,
+                    verbose=self.verbose,
+                )
 
                 return self
 
@@ -1692,11 +1967,20 @@ class Imputation:
                 if params is not None:
                     rank = self._check_params(user_def, params)[0]
                 else:
-                    rank = utils.load_parameters(query="default", algorithm=self.algorithm, verbose=self.verbose)
+                    rank = utils.load_parameters(
+                        query="default", algorithm=self.algorithm, verbose=self.verbose
+                    )
 
-                rank = utils.compute_rank_check(M=self.incomp_data.shape[0], rank=rank, verbose=self.verbose)
+                rank = utils.compute_rank_check(
+                    M=self.incomp_data.shape[0], rank=rank, verbose=self.verbose
+                )
 
-                self.recov_data = tkcm(incomp_data=self.incomp_data, rank=rank, logs=self.logs, verbose=self.verbose)
+                self.recov_data = tkcm(
+                    incomp_data=self.incomp_data,
+                    rank=rank,
+                    logs=self.logs,
+                    verbose=self.verbose,
+                )
 
                 return self
 
@@ -1728,7 +2012,6 @@ class Imputation:
             Imputation method using Hankel Matrix Factorization to recover from blackouts in tagged time series.
         """
 
-
         class MRNN(BaseImputer):
             """
             MRNN class to impute missing values using Multi-directional Recurrent Neural Networks (MRNN).
@@ -1738,6 +2021,7 @@ class Imputation:
             impute(self, user_def=True, params=None):
                 Perform imputation using the MRNN algorithm.
             """
+
             algorithm = "mrnn"
 
             def impute(self, user_def=True, params=None, tr_ratio=0.9):
@@ -1789,13 +2073,28 @@ class Imputation:
                     return
 
                 if params is not None:
-                    hidden_dim, learning_rate, iterations, sequence_length = self._check_params(user_def, params)
+                    hidden_dim, learning_rate, iterations, sequence_length = (
+                        self._check_params(user_def, params)
+                    )
                 else:
-                    hidden_dim, learning_rate, iterations, sequence_length = utils.load_parameters(query="default", algorithm=self.algorithm, verbose=self.verbose)
+                    hidden_dim, learning_rate, iterations, sequence_length = (
+                        utils.load_parameters(
+                            query="default",
+                            algorithm=self.algorithm,
+                            verbose=self.verbose,
+                        )
+                    )
 
-                self.recov_data = mrnn(incomp_data=self.incomp_data, hidden_dim=hidden_dim,
-                                       learning_rate=learning_rate, iterations=iterations,
-                                       sequence_length=sequence_length, tr_ratio=tr_ratio, logs=self.logs, verbose=self.verbose)
+                self.recov_data = mrnn(
+                    incomp_data=self.incomp_data,
+                    hidden_dim=hidden_dim,
+                    learning_rate=learning_rate,
+                    iterations=iterations,
+                    sequence_length=sequence_length,
+                    tr_ratio=tr_ratio,
+                    logs=self.logs,
+                    verbose=self.verbose,
+                )
 
                 return self
 
@@ -1808,6 +2107,7 @@ class Imputation:
             impute(self, user_def=True, params=None):
                 Perform imputation using the BRITS algorithm.
             """
+
             algorithm = "brits"
 
             def impute(self, user_def=True, params=None, tr_ratio=0.9):
@@ -1862,13 +2162,41 @@ class Imputation:
                     return
 
                 if params is not None:
-                    model, epoch, batch_size, nbr_features, hidden_layer, num_workers = self._check_params(user_def, params)
+                    (
+                        model,
+                        epoch,
+                        batch_size,
+                        nbr_features,
+                        hidden_layer,
+                        num_workers,
+                    ) = self._check_params(user_def, params)
                 else:
-                    model, epoch, batch_size, nbr_features, hidden_layer, num_workers = utils.load_parameters(query="default", algorithm=self.algorithm, verbose=self.verbose)
+                    (
+                        model,
+                        epoch,
+                        batch_size,
+                        nbr_features,
+                        hidden_layer,
+                        num_workers,
+                    ) = utils.load_parameters(
+                        query="default", algorithm=self.algorithm, verbose=self.verbose
+                    )
 
                 seq_length = self.incomp_data.shape[1]
 
-                self.recov_data = brits(incomp_data=self.incomp_data, model=model, epoch=epoch, batch_size=batch_size, nbr_features=nbr_features, hidden_layers=hidden_layer, seq_length=seq_length, num_workers=num_workers, tr_ratio=tr_ratio, logs=self.logs, verbose=self.verbose)
+                self.recov_data = brits(
+                    incomp_data=self.incomp_data,
+                    model=model,
+                    epoch=epoch,
+                    batch_size=batch_size,
+                    nbr_features=nbr_features,
+                    hidden_layers=hidden_layer,
+                    seq_length=seq_length,
+                    num_workers=num_workers,
+                    tr_ratio=tr_ratio,
+                    logs=self.logs,
+                    verbose=self.verbose,
+                )
                 return self
 
         class DeepMVI(BaseImputer):
@@ -1880,6 +2208,7 @@ class Imputation:
             impute(self, user_def=True, params=None):
                 Perform imputation using the DeepMVI algorithm.
             """
+
             algorithm = "deep_mvi"
 
             def impute(self, user_def=True, params=None, tr_ratio=0.9):
@@ -1933,9 +2262,19 @@ class Imputation:
                 if params is not None:
                     max_epoch, patience, lr = self._check_params(user_def, params)
                 else:
-                    max_epoch, patience, lr = utils.load_parameters(query="default", algorithm=self.algorithm, verbose=self.verbose)
+                    max_epoch, patience, lr = utils.load_parameters(
+                        query="default", algorithm=self.algorithm, verbose=self.verbose
+                    )
 
-                self.recov_data = deep_mvi(incomp_data=self.incomp_data, max_epoch=max_epoch, patience=patience, lr=lr, tr_ratio=tr_ratio, logs=self.logs, verbose=self.verbose)
+                self.recov_data = deep_mvi(
+                    incomp_data=self.incomp_data,
+                    max_epoch=max_epoch,
+                    patience=patience,
+                    lr=lr,
+                    tr_ratio=tr_ratio,
+                    logs=self.logs,
+                    verbose=self.verbose,
+                )
                 return self
 
         class MPIN(BaseImputer):
@@ -1948,6 +2287,7 @@ class Imputation:
             impute(self, user_def=True, params=None):
                 Perform imputation using the MPIN algorithm.
             """
+
             algorithm = "mpin"
 
             def impute(self, user_def=True, params=None, tr_ratio=0.9):
@@ -2007,13 +2347,51 @@ class Imputation:
                 from imputegap.algorithms.mpin import mpin
 
                 if params is not None:
-                    incre_mode, window, k, learning_rate, weight_decay, epochs, num_of_iteration, threshold, base = self._check_params(user_def, params)
+                    (
+                        incre_mode,
+                        window,
+                        k,
+                        learning_rate,
+                        weight_decay,
+                        epochs,
+                        num_of_iteration,
+                        threshold,
+                        base,
+                    ) = self._check_params(user_def, params)
                 else:
-                    incre_mode, window, k, learning_rate, weight_decay, epochs, num_of_iteration, threshold, base = utils.load_parameters(query="default", algorithm=self.algorithm, verbose=self.verbose)
+                    (
+                        incre_mode,
+                        window,
+                        k,
+                        learning_rate,
+                        weight_decay,
+                        epochs,
+                        num_of_iteration,
+                        threshold,
+                        base,
+                    ) = utils.load_parameters(
+                        query="default", algorithm=self.algorithm, verbose=self.verbose
+                    )
 
-                k = utils.compute_rank_check(M=self.incomp_data.shape[0], rank=k, verbose=self.verbose)
+                k = utils.compute_rank_check(
+                    M=self.incomp_data.shape[0], rank=k, verbose=self.verbose
+                )
 
-                self.recov_data = mpin(incomp_data=self.incomp_data, incre_mode=incre_mode, window=window, k=k, lr=learning_rate, weight_decay=weight_decay, epochs=epochs, num_of_iteration=num_of_iteration, thre=threshold, base=base, tr_ratio=tr_ratio, logs=self.logs, verbose=self.verbose)
+                self.recov_data = mpin(
+                    incomp_data=self.incomp_data,
+                    incre_mode=incre_mode,
+                    window=window,
+                    k=k,
+                    lr=learning_rate,
+                    weight_decay=weight_decay,
+                    epochs=epochs,
+                    num_of_iteration=num_of_iteration,
+                    thre=threshold,
+                    base=base,
+                    tr_ratio=tr_ratio,
+                    logs=self.logs,
+                    verbose=self.verbose,
+                )
                 return self
 
         class PRISTI(BaseImputer):
@@ -2025,6 +2403,7 @@ class Imputation:
             impute(self, user_def=True, params=None):
                 Perform imputation using the PRISTI algorithm.
             """
+
             algorithm = "pristi"
 
             def impute(self, user_def=True, params=None, tr_ratio=0.9):
@@ -2078,11 +2457,38 @@ class Imputation:
                 from imputegap.algorithms.pristi import pristi
 
                 if params is not None:
-                    target_strategy, unconditional, batch_size, embedding, num_workers, seed = self._check_params(user_def, params)
+                    (
+                        target_strategy,
+                        unconditional,
+                        batch_size,
+                        embedding,
+                        num_workers,
+                        seed,
+                    ) = self._check_params(user_def, params)
                 else:
-                    target_strategy, unconditional, batch_size, embedding, num_workers, seed = utils.load_parameters(query="default", algorithm=self.algorithm, verbose=self.verbose)
+                    (
+                        target_strategy,
+                        unconditional,
+                        batch_size,
+                        embedding,
+                        num_workers,
+                        seed,
+                    ) = utils.load_parameters(
+                        query="default", algorithm=self.algorithm, verbose=self.verbose
+                    )
 
-                self.recov_data = pristi(incomp_data=self.incomp_data, target_strategy=target_strategy, unconditional=unconditional, batch_size=batch_size, embedding=embedding, num_workers=num_workers, tr_ratio=tr_ratio, seed=seed, logs=self.logs, verbose=self.verbose)
+                self.recov_data = pristi(
+                    incomp_data=self.incomp_data,
+                    target_strategy=target_strategy,
+                    unconditional=unconditional,
+                    batch_size=batch_size,
+                    embedding=embedding,
+                    num_workers=num_workers,
+                    tr_ratio=tr_ratio,
+                    seed=seed,
+                    logs=self.logs,
+                    verbose=self.verbose,
+                )
                 return self
 
         class MissNet(BaseImputer):
@@ -2095,6 +2501,7 @@ class Imputation:
             impute(self, user_def=True, params=None):
                 Perform imputation using the MissNet algorithm.
             """
+
             algorithm = "miss_net"
 
             def impute(self, user_def=True, params=None, tr_ratio=0.9):
@@ -2149,14 +2556,33 @@ class Imputation:
                 from imputegap.algorithms.miss_net import miss_net
 
                 if params is not None:
-                    alpha, beta, L, n_cl, max_iteration, tol, random_init = self._check_params(user_def, params)
+                    alpha, beta, L, n_cl, max_iteration, tol, random_init = (
+                        self._check_params(user_def, params)
+                    )
                 else:
-                    alpha, beta, L, n_cl, max_iteration, tol, random_init = utils.load_parameters(query="default", algorithm=self.algorithm, verbose=self.verbose)
+                    alpha, beta, L, n_cl, max_iteration, tol, random_init = (
+                        utils.load_parameters(
+                            query="default",
+                            algorithm=self.algorithm,
+                            verbose=self.verbose,
+                        )
+                    )
 
-                self.recov_data = miss_net(incomp_data=self.incomp_data, alpha=alpha, beta=beta, L=L, n_cl=n_cl, max_iteration=max_iteration, tol=tol, random_init=random_init, tr_ratio=tr_ratio, logs=self.logs, verbose=self.verbose)
+                self.recov_data = miss_net(
+                    incomp_data=self.incomp_data,
+                    alpha=alpha,
+                    beta=beta,
+                    L=L,
+                    n_cl=n_cl,
+                    max_iteration=max_iteration,
+                    tol=tol,
+                    random_init=random_init,
+                    tr_ratio=tr_ratio,
+                    logs=self.logs,
+                    verbose=self.verbose,
+                )
 
                 return self
-
 
         class GAIN(BaseImputer):
             """
@@ -2220,14 +2646,26 @@ class Imputation:
                 from imputegap.algorithms.gain import gain
 
                 if params is not None:
-                    batch_size, hint_rate, alpha, epoch = self._check_params(user_def, params)
+                    batch_size, hint_rate, alpha, epoch = self._check_params(
+                        user_def, params
+                    )
                 else:
-                    batch_size, hint_rate, alpha, epoch = utils.load_parameters(query="default", algorithm=self.algorithm, verbose=self.verbose)
+                    batch_size, hint_rate, alpha, epoch = utils.load_parameters(
+                        query="default", algorithm=self.algorithm, verbose=self.verbose
+                    )
 
-                self.recov_data = gain(incomp_data=self.incomp_data, batch_size=batch_size, hint_rate=hint_rate, alpha=alpha, epoch=epoch, tr_ratio=tr_ratio, logs=self.logs, verbose=self.verbose)
+                self.recov_data = gain(
+                    incomp_data=self.incomp_data,
+                    batch_size=batch_size,
+                    hint_rate=hint_rate,
+                    alpha=alpha,
+                    epoch=epoch,
+                    tr_ratio=tr_ratio,
+                    logs=self.logs,
+                    verbose=self.verbose,
+                )
 
                 return self
-
 
         class GRIN(BaseImputer):
             """
@@ -2305,12 +2743,166 @@ class Imputation:
                 from imputegap.algorithms.grin import grin
 
                 if params is not None:
-                    d_hidden, lr, batch_size, window, alpha, patience, epochs, workers = self._check_params(user_def, params)
+                    (
+                        d_hidden,
+                        lr,
+                        batch_size,
+                        window,
+                        alpha,
+                        patience,
+                        epochs,
+                        workers,
+                    ) = self._check_params(user_def, params)
                 else:
-                    d_hidden, lr, batch_size, window, alpha, patience, epochs, workers = utils.load_parameters(query="default", algorithm=self.algorithm, verbose=self.verbose)
+                    (
+                        d_hidden,
+                        lr,
+                        batch_size,
+                        window,
+                        alpha,
+                        patience,
+                        epochs,
+                        workers,
+                    ) = utils.load_parameters(
+                        query="default", algorithm=self.algorithm, verbose=self.verbose
+                    )
 
-                self.recov_data = grin(incomp_data=self.incomp_data, d_hidden=d_hidden, lr=lr, batch_size=batch_size, window=window, alpha=alpha, patience=patience, epochs=epochs, workers=workers, tr_ratio=tr_ratio, logs=self.logs, verbose=self.verbose)
+                self.recov_data = grin(
+                    incomp_data=self.incomp_data,
+                    d_hidden=d_hidden,
+                    lr=lr,
+                    batch_size=batch_size,
+                    window=window,
+                    alpha=alpha,
+                    patience=patience,
+                    epochs=epochs,
+                    workers=workers,
+                    tr_ratio=tr_ratio,
+                    logs=self.logs,
+                    verbose=self.verbose,
+                )
 
+                return self
+
+        class RECTSI(BaseImputer):
+            """
+            RECTSI class to impute missing values using Resource-Efficient Correlated Time Series Imputation.
+
+            Methods
+            -------
+            impute(self, user_def=True, params=None):
+                Perform imputation using the RECTSI
+            """
+
+            algorithm = "rectsi"
+
+            def __init__(self, incomp_data, periodicity: int):
+                """
+                Initialize the RECTSI imputer with incomplete data and periodicity per day.
+
+                :param incomp_data: np.ndarray
+                :param periodicity: int, optional
+                    Periodicity of the time series data (default is 24 for hourly data).
+                """
+
+                super().__init__(incomp_data)
+                self.periodicity = periodicity
+
+            def impute(self, user_def=True, params=None, tr_ratio=0.9):
+                """
+                Perform imputation using the Multivariate Time Series Imputation by Graph Neural Networks
+
+                Parameters
+                ----------
+                user_def : bool, optional
+                    Whether to use user-defined or default parameters (default is True).
+
+                params : dict, optional
+                    Parameters of the RECTSI algorithm or Auto-ML configuration, if None, default ones are loaded.
+
+                tr_ratio: float, optional
+                    Split ratio between training and testing sets (default is 0.9).
+
+
+                    **Algorithm parameters:**
+
+                        d_hidden : int, optional, default=32
+                            The number of hidden units in the model's recurrent and graph layers.
+
+                        lr : float, optional, default=0.001
+                            Learning rate for the optimizer.
+
+                        batch_size : int, optional, default=32
+                            The number of samples per training batch.
+
+                        window : int, optional, default=10
+                            The size of the time window used for modeling temporal dependencies.
+
+                        alpha : float, optional, default=10.0
+                            The weight assigned to the adversarial loss term during training.
+
+                        patience : int, optional, default=4
+                            Number of epochs without improvement before early stopping is triggered.
+
+                        epochs : int, optional, default=20
+                            The maximum number of training epochs.
+
+                        workers : int, optional, default=2
+                            The number of worker processes for data loading.
+
+
+                Returns
+                -------
+                self : RECTSI
+                    RECTSI object with `recov_data` set.
+
+                Example
+                -------
+                    >>> rectsi_imputer = Imputation.DeepLearning.RECTSI(incomp_data)
+                    >>> rectsi_imputer.impute()  # default parameters for imputation > or
+                    >>> rectsi_imputer.impute(user_def=True, params={"d_hidden":32, "lr":0.001, "batch_size":32, "patience":4, "epochs":20, "workers":2})  # user defined> or
+                    >>> rectsi_imputer.impute(user_def=False, params={"input_data": ts.data, "optimizer": "ray_tune"})  # auto-ml with ray_tune
+                    >>> recov_data = rectsi_imputer.recov_data
+                References
+                ----------
+                Z. Lai, D. Zhang, H. Li, D. Zhang, H. Lu, and C. S. Jensen, “Rectsi: Resource-efficient correlated time series imputation via decoupled pattern learning and completeness-aware attentions”
+
+                """
+                from imputegap.algorithms.rectsi import rectsi
+
+                if params is not None:
+                    (
+                        lr,
+                        batch_size,
+                        patience,
+                        epochs,
+                        workers,
+                        tr_ratio_config,
+                    ) = self._check_params(user_def, params)
+                else:
+                    (
+                        lr,
+                        batch_size,
+                        patience,
+                        epochs,
+                        workers,
+                        tr_ratio_config,
+                    ) = utils.load_parameters(
+                        query="default", algorithm=self.algorithm, verbose=self.verbose
+                    )
+
+                self.recov_data = rectsi(
+                    incomp_data=self.incomp_data,
+                    lr=lr,
+                    batch_size=batch_size,
+                    patience=patience,
+                    epochs=epochs,
+                    workers=workers,
+                    tr_ratio=tr_ratio_config if tr_ratio is None else tr_ratio,
+                    logs=self.logs,
+                    verbose=self.verbose,
+                    periodicity=self.periodicity,
+                )
                 return self
 
         class BayOTIDE(BaseImputer):
@@ -2407,15 +2999,51 @@ class Imputation:
                     return
 
                 if params is not None:
-                    K_trend, K_season, n_season, K_bias, time_scale, a0, b0, v, num_workers, tr_ratio = self._check_params(user_def, params)
+                    (
+                        K_trend,
+                        K_season,
+                        n_season,
+                        K_bias,
+                        time_scale,
+                        a0,
+                        b0,
+                        v,
+                        num_workers,
+                        tr_ratio,
+                    ) = self._check_params(user_def, params)
                 else:
-                    K_trend, K_season, n_season, K_bias, time_scale, a0, b0, v, num_workers, tr_ratio = utils.load_parameters(query="default", algorithm=self.algorithm, verbose=self.verbose)
+                    (
+                        K_trend,
+                        K_season,
+                        n_season,
+                        K_bias,
+                        time_scale,
+                        a0,
+                        b0,
+                        v,
+                        num_workers,
+                        tr_ratio,
+                    ) = utils.load_parameters(
+                        query="default", algorithm=self.algorithm, verbose=self.verbose
+                    )
 
-                self.recov_data = bay_otide(incomp_data=self.incomp_data, K_trend=K_trend, K_season=K_season, n_season=n_season, K_bias=K_bias, time_scale=time_scale, a0=a0, b0=b0, v=v, num_workers=num_workers, tr_ratio=tr_ratio, logs=self.logs, verbose=self.verbose)
+                self.recov_data = bay_otide(
+                    incomp_data=self.incomp_data,
+                    K_trend=K_trend,
+                    K_season=K_season,
+                    n_season=n_season,
+                    K_bias=K_bias,
+                    time_scale=time_scale,
+                    a0=a0,
+                    b0=b0,
+                    v=v,
+                    num_workers=num_workers,
+                    tr_ratio=tr_ratio,
+                    logs=self.logs,
+                    verbose=self.verbose,
+                )
 
                 return self
-
-
 
         class HKMF_T(BaseImputer):
             """
@@ -2482,14 +3110,24 @@ class Imputation:
                 if params is not None:
                     tags, data_names, epoch = self._check_params(user_def, params)
                 else:
-                    tags, data_names, epoch = utils.load_parameters(query="default", algorithm=self.algorithm, verbose=self.verbose)
+                    tags, data_names, epoch = utils.load_parameters(
+                        query="default", algorithm=self.algorithm, verbose=self.verbose
+                    )
 
                 if not tags:
                     tags = None
                 if not data_names:
                     data_names = None
 
-                self.recov_data = hkmf_t(incomp_data=self.incomp_data, tags=tags, data_names=data_names, epoch=epoch, tr_ratio=tr_ratio, logs=self.logs, verbose=self.verbose)
+                self.recov_data = hkmf_t(
+                    incomp_data=self.incomp_data,
+                    tags=tags,
+                    data_names=data_names,
+                    epoch=epoch,
+                    tr_ratio=tr_ratio,
+                    logs=self.logs,
+                    verbose=self.verbose,
+                )
 
                 return self
 
@@ -2576,11 +3214,52 @@ class Imputation:
                 from imputegap.algorithms.bit_graph import bit_graph
 
                 if params is not None:
-                    node_number, kernel_set, dropout, subgraph_size, node_dim, seq_len, lr, batch_size, epoch, num_workers, seed = self._check_params(user_def, params)
+                    (
+                        node_number,
+                        kernel_set,
+                        dropout,
+                        subgraph_size,
+                        node_dim,
+                        seq_len,
+                        lr,
+                        batch_size,
+                        epoch,
+                        num_workers,
+                        seed,
+                    ) = self._check_params(user_def, params)
                 else:
-                    node_number, kernel_set, dropout, subgraph_size, node_dim, seq_len, lr, batch_size, epoch, num_workers, seed = utils.load_parameters(query="default", algorithm=self.algorithm, verbose=self.verbose)
+                    (
+                        node_number,
+                        kernel_set,
+                        dropout,
+                        subgraph_size,
+                        node_dim,
+                        seq_len,
+                        lr,
+                        batch_size,
+                        epoch,
+                        num_workers,
+                        seed,
+                    ) = utils.load_parameters(
+                        query="default", algorithm=self.algorithm, verbose=self.verbose
+                    )
 
-                self.recov_data = bit_graph(incomp_data=self.incomp_data, node_number=node_number, kernel_set=kernel_set, dropout=dropout, subgraph_size=subgraph_size, node_dim=node_dim, seq_len=seq_len, lr=lr, epoch=epoch, num_workers=num_workers, tr_ratio=tr_ratio, seed=seed, logs=self.logs, verbose=self.verbose)
+                self.recov_data = bit_graph(
+                    incomp_data=self.incomp_data,
+                    node_number=node_number,
+                    kernel_set=kernel_set,
+                    dropout=dropout,
+                    subgraph_size=subgraph_size,
+                    node_dim=node_dim,
+                    seq_len=seq_len,
+                    lr=lr,
+                    epoch=epoch,
+                    num_workers=num_workers,
+                    tr_ratio=tr_ratio,
+                    seed=seed,
+                    logs=self.logs,
+                    verbose=self.verbose,
+                )
 
                 return self
 
@@ -2684,14 +3363,55 @@ class Imputation:
                 from imputegap.algorithms.nuwats import nuwats
 
                 if params is not None:
-                    seq_length, patch_size, batch_size, pred_length, label_length, enc_in, dec_in, c_out, gpt_layers, num_workers, seed = self._check_params(user_def, params)
+                    (
+                        seq_length,
+                        patch_size,
+                        batch_size,
+                        pred_length,
+                        label_length,
+                        enc_in,
+                        dec_in,
+                        c_out,
+                        gpt_layers,
+                        num_workers,
+                        seed,
+                    ) = self._check_params(user_def, params)
                 else:
-                    seq_length, patch_size, batch_size, pred_length, label_length, enc_in, dec_in, c_out, gpt_layers, num_workers, seed = utils.load_parameters(query="default", algorithm=self.algorithm, verbose=self.verbose)
+                    (
+                        seq_length,
+                        patch_size,
+                        batch_size,
+                        pred_length,
+                        label_length,
+                        enc_in,
+                        dec_in,
+                        c_out,
+                        gpt_layers,
+                        num_workers,
+                        seed,
+                    ) = utils.load_parameters(
+                        query="default", algorithm=self.algorithm, verbose=self.verbose
+                    )
 
-                self.recov_data = nuwats(incomp_data=self.incomp_data, seq_length=seq_length, patch_size=patch_size, batch_size=batch_size, pred_length=pred_length, label_length=label_length, enc_in=enc_in, dec_in=dec_in, c_out=c_out, gpt_layers=gpt_layers, num_workers=num_workers, tr_ratio=tr_ratio, seed=seed, logs=self.logs, verbose=self.verbose)
+                self.recov_data = nuwats(
+                    incomp_data=self.incomp_data,
+                    seq_length=seq_length,
+                    patch_size=patch_size,
+                    batch_size=batch_size,
+                    pred_length=pred_length,
+                    label_length=label_length,
+                    enc_in=enc_in,
+                    dec_in=dec_in,
+                    c_out=c_out,
+                    gpt_layers=gpt_layers,
+                    num_workers=num_workers,
+                    tr_ratio=tr_ratio,
+                    seed=seed,
+                    logs=self.logs,
+                    verbose=self.verbose,
+                )
 
                 return self
-
 
         class GPT4TS(BaseImputer):
             """
@@ -2789,12 +3509,52 @@ class Imputation:
                 from imputegap.algorithms.gpt4ts import gpt4ts
 
                 if params is not None:
-                    seq_length, patch_size, batch_size, pred_length, label_length, enc_in, dec_in, c_out, gpt_layers, num_workers, seed = self._check_params(user_def, params)
+                    (
+                        seq_length,
+                        patch_size,
+                        batch_size,
+                        pred_length,
+                        label_length,
+                        enc_in,
+                        dec_in,
+                        c_out,
+                        gpt_layers,
+                        num_workers,
+                        seed,
+                    ) = self._check_params(user_def, params)
                 else:
-                    seq_length, patch_size, batch_size, pred_length, label_length, enc_in, dec_in, c_out, gpt_layers, num_workers, seed = utils.load_parameters(query="default", algorithm=self.algorithm, verbose=self.verbose)
+                    (
+                        seq_length,
+                        patch_size,
+                        batch_size,
+                        pred_length,
+                        label_length,
+                        enc_in,
+                        dec_in,
+                        c_out,
+                        gpt_layers,
+                        num_workers,
+                        seed,
+                    ) = utils.load_parameters(
+                        query="default", algorithm=self.algorithm, verbose=self.verbose
+                    )
 
-                self.recov_data = gpt4ts(incomp_data=self.incomp_data,  seq_length=seq_length, patch_size=patch_size, batch_size=batch_size, pred_length=pred_length, label_length=label_length, enc_in=enc_in, dec_in=dec_in, c_out=c_out, gpt_layers=gpt_layers, num_workers=num_workers, tr_ratio=tr_ratio, seed=seed, logs=self.logs, verbose=self.verbose)
+                self.recov_data = gpt4ts(
+                    incomp_data=self.incomp_data,
+                    seq_length=seq_length,
+                    patch_size=patch_size,
+                    batch_size=batch_size,
+                    pred_length=pred_length,
+                    label_length=label_length,
+                    enc_in=enc_in,
+                    dec_in=dec_in,
+                    c_out=c_out,
+                    gpt_layers=gpt_layers,
+                    num_workers=num_workers,
+                    tr_ratio=tr_ratio,
+                    seed=seed,
+                    logs=self.logs,
+                    verbose=self.verbose,
+                )
 
                 return self
-
-
