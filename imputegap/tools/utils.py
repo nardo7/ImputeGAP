@@ -599,7 +599,7 @@ def load_parameters(
         return None
 
 
-def config_impute_algorithm(incomp_data, algorithm, verbose=True):
+def config_impute_algorithm(incomp_data, algorithm, verbose=True, **algo_params):
     """
     Configure and execute algorithm for selected imputation imputer and pattern.
 
@@ -695,6 +695,12 @@ def config_impute_algorithm(incomp_data, algorithm, verbose=True):
         imputer = Imputation.DeepLearning.BitGraph(incomp_data)
     elif alg == "meanimpute":
         imputer = Imputation.Statistics.MeanImpute(incomp_data)
+    elif alg == "rectsi":
+        if "periodicity" not in algo_params:
+            raise ValueError(
+                "(IMP) 'periodicity' parameter must be provided for RECTSI imputer."
+            )
+        imputer = Imputation.DeepLearning.RECTSI(incomp_data, **algo_params)
 
     # 4th generation
     elif alg == "nuwats":
@@ -2219,6 +2225,7 @@ def list_of_algorithms_with_families():
             "DeepLearning.MissNet",
             "DeepLearning.GAIN",
             "DeepLearning.GRIN",
+            "DeepLearning.ReCTSi",
             "DeepLearning.BayOTIDE",
             "DeepLearning.HKMF_T",
             "DeepLearning.BitGraph",

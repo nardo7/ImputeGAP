@@ -269,11 +269,11 @@ class ReCTSINet(nn.Module):
             self.model_dim - self.input_emb_dim
         ) // 2 + self.input_emb_dim
 
-        print("self.input_emb_dim", self.input_emb_dim)
-        print("self.model_dim", self.model_dim)
-        print("self.model_dim2", self.model_dim2)
-        print("self.base_dim", self.base_dim)
-        print("self.num_layers", self.num_layers)
+        # print("self.input_emb_dim", self.input_emb_dim)
+        # print("self.model_dim", self.model_dim)
+        # print("self.model_dim2", self.model_dim2)
+        # print("self.base_dim", self.base_dim)
+        # print("self.num_layers", self.num_layers)
         # print('self.groups', self.groups)
         self.input_proj = nn.Linear(3, self.input_emb_dim)
         self.tod_embedding = nn.Embedding(self.steps_per_day, self.tod_emb_dim)

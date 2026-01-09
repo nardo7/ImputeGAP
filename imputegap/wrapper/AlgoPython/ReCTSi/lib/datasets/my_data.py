@@ -123,7 +123,7 @@ class MissingValuesMyData(MyData):
         idx = np.arange(len(dataset))
         train_size = int(len(dataset) * train_len)
         train_idxs = idx[: train_size - window]
-        test_idxs = idx[train_size:]
+        val_idxs = idx[train_size:]
 
         # presumably val_idxs is used as the whole input data for validation in imputeGAP
-        return train_idxs, idx, test_idxs
+        return train_idxs, val_idxs, idx

@@ -313,10 +313,10 @@ def recoveryReCTSi(
 
     with torch.no_grad():
         y_true, y_hat, mask = filler.predict_loader(
-            dm.val_dataloader(), return_mask=True
+            dm.test_dataloader(), return_mask=True
         )
 
-    index = dm.torch_dataset.data_timestamps(dm.valset.indices, flatten=False)[
+    index = dm.torch_dataset.data_timestamps(dm.testset.indices, flatten=False)[
         "horizon"
     ]
     third_of_columns = dataset.df.shape[1] // 3
